@@ -668,7 +668,12 @@ safeUrl(raw: string, allowedHosts: string[]): string | null
 
 # Jeju-Hackathon Git/GitHub 워크플로우 가이드
 
-> 대상 저장소: https://github.com/CraemyKim/Jeju-Hackathon
+> 대상 저장소:
+> - **공동 저장소**: https://github.com/CraemyKim/Jeju-Hackathon (`upstream` / `origin` 2번째 push URL)
+> - **개인 저장소**: https://github.com/HongYoonSung/Jeju-Hackathon (`origin` 기본 push URL)
+>
+> **push 정책**: `git push origin main` 한 번으로 두 저장소에 동시 push (origin에 push URL 2개 등록)
+>
 > 목적: **pull → branch → commit → push → Pull Request → merge → pull** 한 사이클을 사람과 AI 코딩 도구가 **똑같은 방식으로** 반복하도록 정의한 문서.
 > 💡 `📚 왜?` 박스는 공부용 설명입니다. AI 에이전트는 **0장과 1~8장의 명령/규칙**만 따르면 됩니다.
 
@@ -702,7 +707,7 @@ git config --global pull.rebase false      # pull 시 merge 방식(초보자 안
 
 ### 1.2 저장소 가져오기 (clone)
 ```bash
-git clone https://github.com/CraemyKim/Jeju-Hackathon.git
+git clone https://github.com/HongYoonSung/Jeju-Hackathon.git
 cd Jeju-Hackathon
 ```
 📚 **왜?** clone은 GitHub(원격, `origin`)에 있는 저장소 전체를 내 컴퓨터(로컬)로 복사합니다. 이후 로컬에서 작업하고 `push`로 원격에 올립니다.
@@ -714,12 +719,35 @@ git branch -a                      # 로컬/원격 브랜치 목록
 git symbolic-ref refs/remotes/origin/HEAD   # 기본 브랜치 확인 (예: origin/main)
 ```
 
-### 1.4 인증 (push에 필요)
+### 1.4 두 저장소 동시 push 설정 (최초 1회)
+
+이 프로젝트는 **개인 저장소(HongYoonSung)** 와 **공동 저장소(CraemyKim)** 에 동시에 push합니다.
+
+```bash
+# origin의 기본 fetch/push URL (개인 저장소)
+git remote set-url origin https://github.com/HongYoonSung/Jeju-Hackathon.git
+
+# origin에 공동 저장소 push URL 추가
+git remote set-url --add --push origin https://github.com/HongYoonSung/Jeju-Hackathon.git
+git remote set-url --add --push origin https://github.com/CraemyKim/Jeju-Hackathon.git
+
+# upstream (공동 저장소 fetch용)
+git remote add upstream https://github.com/CraemyKim/Jeju-Hackathon.git
+
+# 확인: origin에 push URL이 2개 보여야 함
+git remote -v
+```
+
+이후 `git push origin main` 한 번으로 두 저장소 모두에 push됩니다.
+
+> ⚠️ CraemyKim/Jeju-Hackathon에 push하려면 해당 계정의 **Collaborator 권한**이 필요합니다.
+
+### 1.5 인증 (push에 필요)
 - **HTTPS**: 첫 push 때 GitHub 로그인 창 또는 **Personal Access Token(PAT)** 입력. 비밀번호가 아니라 토큰을 쓴다. 토큰은 코드/문서에 **절대 적지 않는다.**
 - **GitHub CLI(권장)**: `gh auth login` 후 브라우저 인증. 이후 `gh pr create` 등을 쓸 수 있다.
-- **SSH**를 쓴다면 주소는 `git@github.com:CraemyKim/Jeju-Hackathon.git`.
+- **SSH**를 쓴다면 주소는 `git@github.com:HongYoonSung/Jeju-Hackathon.git`.
 
-### 1.5 협업자 권한
+### 1.6 협업자 권한
 다른 사람 저장소라면 **Settings → Collaborators**에서 초대를 받아야 직접 push 할 수 있다. 권한이 없으면 **Fork → Pull Request** 방식을 쓴다 (9장).
 
 ---
@@ -869,6 +897,9 @@ data/raw/
 git push -u origin feature/f03-search-bar
 ```
 - `-u`(= `--set-upstream`)는 **처음 한 번만**. 이후에는 `git push`만 입력해도 된다.
+- **이 프로젝트는 `origin`에 push URL이 2개 등록되어 있어 한 번의 push로 아래 두 곳에 동시 업로드된다:**
+  - `https://github.com/HongYoonSung/Jeju-Hackathon.git` (개인 저장소)
+  - `https://github.com/CraemyKim/Jeju-Hackathon.git` (공동 저장소)
 
 📚 **왜 push 하나?** commit은 내 컴퓨터에만 저장됩니다. push를 해야 GitHub에 올라가 팀원이 보고, PR을 만들 수 있고, 내 컴퓨터가 고장 나도 코드가 안전합니다.
 
@@ -876,7 +907,7 @@ git push -u origin feature/f03-search-bar
 | 증상 | 조치 |
 |---|---|
 | `rejected (non-fast-forward)` | 원격 브랜치에 내가 모르는 커밋이 있음 → `git pull origin <브랜치>` 후 재시도. **`--force` 금지** |
-| `Permission denied` / 403 | 협업자 권한 없음 → 1.5, 9장 |
+| `Permission denied` / 403 | 협업자 권한 없음 → 1.6, 9장 |
 
 ---
 

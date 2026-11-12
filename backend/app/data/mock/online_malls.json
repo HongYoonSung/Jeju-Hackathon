@@ -1,0 +1,30 @@
+[
+  {
+    "id": "online_001",
+    "name": "쿠팡",
+    "site_name": "쿠팡",
+    "url_template": "https://www.coupang.com/np/search?q={q}",
+    "price_factor": 0.96
+  },
+  {
+    "id": "online_002",
+    "name": "네이버쇼핑",
+    "site_name": "네이버쇼핑",
+    "url_template": "https://search.shopping.naver.com/search/all?query={q}",
+    "price_factor": 0.94
+  },
+  {
+    "id": "online_003",
+    "name": "11번가",
+    "site_name": "11번가",
+    "url_template": "https://search.11st.co.kr/Search.tmall?kwd={q}",
+    "price_factor": 0.98
+  },
+  {
+    "id": "online_004",
+    "name": "G마켓",
+    "site_name": "G마켓",
+    "url_template": "https://browse.gmarket.co.kr/search?keyword={q}",
+    "price_factor": 1.02
+  }
+]

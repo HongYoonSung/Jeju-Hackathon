@@ -1,0 +1,21 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+
+.offline {
+  color: var(--color-primary);
+  background-color: var(--color-primary-tint);
+}
+
+.online {
+  color: var(--color-accent-teal);
+  background-color: var(--color-accent-teal-tint);
+}

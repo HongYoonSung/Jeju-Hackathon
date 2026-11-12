@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 550" width="100%" height="100%">
+  <defs>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EAF0FA" />
+      <stop offset="50%" stop-color="#BEDDF3" />
+      <stop offset="100%" stop-color="#E8EFF8" />
+    </linearGradient>
+  </defs>
+  <rect width="500" height="550" rx="8" fill="url(#skyGrad)" />
+  <path d="M 0 450 Q 150 380 280 430 T 500 420 L 500 550 L 0 550 Z" fill="#234F9F" opacity="0.15" />
+  <path d="M 0 480 Q 180 440 320 470 T 500 460 L 500 550 L 0 550 Z" fill="#1B8F8A" opacity="0.2" />
+  <circle cx="380" cy="120" r="45" fill="#F28A1B" opacity="0.3" />
+  <text x="50%" y="45%" text-anchor="middle" dominant-baseline="middle" font-family="'Pretendard', sans-serif" font-size="20" font-weight="700" fill="#234F9F">
+    제주 풍경 사진 영역
+  </text>
+  <text x="50%" y="52%" text-anchor="middle" dominant-baseline="middle" font-family="'Pretendard', sans-serif" font-size="14" fill="#667085">
+    public/hero-jeju.jpg 파일 추가 시 자동 반영
+  </text>
+</svg>

@@ -1,0 +1,32 @@
+.searchPage {
+  width: 100%;
+  height: calc(100vh - var(--header-h));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mainLayout {
+  flex: 1;
+  display: flex;
+  height: calc(100vh - var(--header-h) - var(--searchbar-h));
+  overflow: hidden;
+}
+
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg);
+  border-right: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.mapArea {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}

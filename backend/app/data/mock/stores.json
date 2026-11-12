@@ -1,0 +1,102 @@
+[
+  {
+    "id": "store_001",
+    "name": "예시마트 노형점",
+    "address": "제주시 노형로 123",
+    "lat": 33.4846,
+    "lng": 126.4783,
+    "price_factor": 0.95,
+    "capacity_index": 1.1,
+    "max_people": 250
+  },
+  {
+    "id": "store_002",
+    "name": "제주하나로마트 연동점",
+    "address": "제주시 신대로 45",
+    "lat": 33.489,
+    "lng": 126.493,
+    "price_factor": 1.0,
+    "capacity_index": 0.9,
+    "max_people": 180
+  },
+  {
+    "id": "store_003",
+    "name": "동문시장 인근할인마트",
+    "address": "제주시 중앙로 67",
+    "lat": 33.496,
+    "lng": 126.547,
+    "price_factor": 0.9,
+    "capacity_index": 1.2,
+    "max_people": 300
+  },
+  {
+    "id": "store_004",
+    "name": "애월로컬푸드마켓",
+    "address": "제주시 애월읍 일주서로 6100",
+    "lat": 33.4619,
+    "lng": 126.3311,
+    "price_factor": 1.05,
+    "capacity_index": 0.8,
+    "max_people": 120
+  },
+  {
+    "id": "store_005",
+    "name": "한림종합상회",
+    "address": "제주시 한림읍 한림로 300",
+    "lat": 33.412,
+    "lng": 126.264,
+    "price_factor": 1.08,
+    "capacity_index": 0.85,
+    "max_people": 140
+  },
+  {
+    "id": "store_006",
+    "name": "조천신선마트",
+    "address": "제주시 조천읍 조천18길 10",
+    "lat": 33.544,
+    "lng": 126.637,
+    "price_factor": 1.02,
+    "capacity_index": 0.75,
+    "max_people": 110
+  },
+  {
+    "id": "store_007",
+    "name": "서귀포중앙할인마트",
+    "address": "서귀포시 일주동로 8600",
+    "lat": 33.2541,
+    "lng": 126.5601,
+    "price_factor": 0.98,
+    "capacity_index": 1.0,
+    "max_people": 220
+  },
+  {
+    "id": "store_008",
+    "name": "성산포나들가게",
+    "address": "서귀포시 성산읍 성산등용로 20",
+    "lat": 33.458,
+    "lng": 126.942,
+    "price_factor": 1.12,
+    "capacity_index": 0.7,
+    "max_people": 100
+  },
+  {
+    "id": "store_009",
+    "name": "모슬포대정유통",
+    "address": "서귀포시 대정읍 하모상로 50",
+    "lat": 33.227,
+    "lng": 126.252,
+    "price_factor": 1.15,
+    "capacity_index": 0.8,
+    "max_people": 130
+  },
+  {
+    "id": "store_010",
+    "name": "표선해비치마트",
+    "address": "서귀포시 표선면 표선백사로 88",
+    "lat": 33.326,
+    "lng": 126.831,
+    "price_factor": 1.04,
+    "capacity_index": 0.85,
+    "max_people": 150
+  }
+]

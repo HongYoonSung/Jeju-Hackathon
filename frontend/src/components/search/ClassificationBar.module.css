@@ -1,0 +1,65 @@
+.bar {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sortRow {
+  display: flex;
+  background-color: var(--color-bg-subtle);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.sortBtn {
+  flex: 1;
+  height: 32px;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
+  border-radius: 2px;
+  transition: all 0.15s ease;
+}
+
+.sortBtn:hover {
+  color: var(--color-text);
+}
+
+.activeSort {
+  background-color: var(--color-bg);
+  color: var(--color-primary);
+  font-weight: var(--fw-bold);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.filterRow {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.filterChip {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  transition: all 0.15s ease;
+}
+
+.filterChip:hover {
+  background-color: var(--color-border);
+}
+
+.activeFilter {
+  background-color: var(--color-primary-tint);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  font-weight: var(--fw-bold);
+}

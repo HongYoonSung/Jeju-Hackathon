@@ -1,0 +1,44 @@
+@import '@fontsource/pretendard';
+@import 'leaflet/dist/leaflet.css';
+@import './tokens.css';
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 숫자 테이블 정렬 (SPEC 4.3) */
+.num, [data-num] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 포커스 링 (SPEC 4.3) */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}

@@ -22,6 +22,8 @@ Thumbs.db
 
 # 데이터·모델 (용량/반출 불가/개인정보)
 data/raw/
+backend/data/*.sqlite3
+backend/data/*.db
 *.csv
 *.parquet
 *.gguf

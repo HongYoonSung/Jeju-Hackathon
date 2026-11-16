@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { useAuthStore } from '../store/useAuthStore';
 import styles from './Auth.module.css';
 
 export const SignupPage: React.FC = () => {
+  const navigate = useNavigate();
+  const setUser = useAuthStore((state) => state.setUser);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -50,14 +53,17 @@ export const SignupPage: React.FC = () => {
     setServerNotice(null);
 
     try {
-      await api.signup({
-        id: username,
+      const user = await api.signup({
+        id: username.trim(),
         password,
         passwordConfirm,
       });
-    } catch {
-      // 서버는 501 반환 -> "준비 중인 기능입니다." 표시 (SPEC 5.2)
-      setServerNotice('준비 중인 기능입니다.');
+      setUser(user);
+      navigate('/', { replace: true });
+    } catch (error) {
+      setServerNotice(
+        error instanceof Error ? error.message : '회원가입에 실패했어요.',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -99,6 +105,7 @@ export const SignupPage: React.FC = () => {
             <input
               id="signup-pw"
               type="password"
+              maxLength={128}
               className={styles.input}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -116,6 +123,7 @@ export const SignupPage: React.FC = () => {
             <input
               id="signup-pw-confirm"
               type="password"
+              maxLength={128}
               className={styles.input}
               value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}

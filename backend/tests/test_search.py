@@ -6,7 +6,8 @@ from app.schemas import SearchResponse, PlaceResult, OnlinePlace, PriceInfo
 
 
 @pytest.mark.asyncio
-async def test_search_normal_and_crowd_filled():
+async def test_search_normal_and_crowd_filled(monkeypatch):
+    monkeypatch.setattr(settings, "ROUTER", "estimate")
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.post(
@@ -28,6 +29,8 @@ async def test_search_normal_and_crowd_filled():
             assert off["crowd"] is not None
             assert off["crowd"]["level"] in ["low", "medium", "high", "very_high"]
             assert off["crowd"]["estimated_people"] >= 0
+            assert off["road"]["distance_m"] > 0
+            assert off["road"]["source"] == "estimate"
 
 
 @pytest.mark.asyncio
@@ -42,6 +45,7 @@ async def test_search_empty_query_422():
 
 @pytest.mark.asyncio
 async def test_search_disallowed_deeplink_filtered(monkeypatch):
+    monkeypatch.setattr(settings, "ROUTER", "estimate")
     # 가짜 에이전트가 허용되지 않은 deeplink_url을 반환하도록 주입
     from app.ai.registry import get_ai_agent
     agent = get_ai_agent()

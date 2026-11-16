@@ -12,15 +12,24 @@
   width: 100%;
 }
 
+.searchForm {
+  flex: 1;
+  min-width: 0;
+}
+
 .inputWrapper {
   flex: 1;
   display: flex;
   height: 52px;
-  background-color: var(--color-bg);
-  border: 2px solid var(--color-primary);
-  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 2px 6px rgba(35, 79, 159, 0.1);
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.inputWrapper:focus-within {
+  box-shadow: 0 0 0 2px var(--color-primary);
 }
 
 .input {
@@ -45,7 +54,7 @@
   font-size: 15px;
   font-weight: var(--fw-bold);
   border: none;
-  border-radius: 0;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   transition: background-color 0.15s ease;
   white-space: nowrap;
 }
@@ -63,6 +72,26 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  .form {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .searchForm {
+    width: 100%;
+  }
+
+  .inputWrapper {
+    flex: none;
+  }
+
+  .locationWrapper {
+    min-height: 32px;
+  }
 }
 
 .errorBanner {

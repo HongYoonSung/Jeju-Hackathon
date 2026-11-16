@@ -1,9 +1,12 @@
+import logging
 from typing import Optional
 import httpx
 from app.config import settings
 from app.providers.route_base import BaseRouter
 from app.providers.route_estimate import EstimateRouter
-from app.schemas import LatLng, RouteResponse
+from app.schemas import LatLng, MetricResult, RouteResponse
+
+logger = logging.getLogger(__name__)
 
 
 class OSRMRouter(BaseRouter):
@@ -21,7 +24,7 @@ class OSRMRouter(BaseRouter):
         params = {"overview": "full", "geometries": "geojson"}
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=settings.ROUTER_TIMEOUT_S) as client:
                 resp = await client.get(url, params=params)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -39,7 +42,61 @@ class OSRMRouter(BaseRouter):
                             geometry=geometry,
                             provider="osrm",
                         )
-        except Exception:
-            pass
+                logger.warning("OSRM route request failed with status %s", resp.status_code)
+        except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
+            logger.warning("OSRM route request failed: %s", type(exc).__name__)
 
         return await self.fallback.route(origin, destination, mode)
+
+    async def metrics(
+        self, origin: LatLng, destinations: list[tuple[str, LatLng]]
+    ) -> list[MetricResult]:
+        if not destinations:
+            return []
+
+        base_url = settings.OSRM_BASE_URL.rstrip("/")
+        if not base_url:
+            return await self.fallback.metrics(origin, destinations)
+
+        coordinates = ";".join(
+            [f"{origin.lng},{origin.lat}"]
+            + [f"{destination.lng},{destination.lat}" for _, destination in destinations]
+        )
+        url = f"{base_url}/table/v1/driving/{coordinates}"
+        params = {"sources": "0", "annotations": "distance,duration"}
+
+        try:
+            async with httpx.AsyncClient(timeout=settings.ROUTER_TIMEOUT_S) as client:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
+                distances = data.get("distances", [[]])[0]
+                durations = data.get("durations", [[]])[0]
+                results = []
+                for index, (destination_id, destination) in enumerate(destinations):
+                    distance = distances[index + 1] if index + 1 < len(distances) else None
+                    duration = durations[index + 1] if index + 1 < len(durations) else None
+                    if distance is not None and duration is not None:
+                        results.append(
+                            MetricResult(
+                                id=destination_id,
+                                distance_m=int(round(distance)),
+                                duration_s=int(round(duration)),
+                                source="osrm",
+                            )
+                        )
+                    else:
+                        fallback = await self.fallback.route(origin, destination)
+                        if fallback is not None:
+                            results.append(
+                                MetricResult(
+                                    id=destination_id,
+                                    distance_m=fallback.distance_m,
+                                    duration_s=fallback.duration_s,
+                                    source=fallback.provider,
+                                )
+                            )
+                return results
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            logger.warning("OSRM matrix request failed: %s", type(exc).__name__)
+            return await self.fallback.metrics(origin, destinations)

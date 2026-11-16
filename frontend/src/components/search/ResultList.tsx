@@ -1,14 +1,11 @@
 import React from 'react';
 import { useSearchStore } from '../../store/useSearchStore';
-import { useLocationStore } from '../../store/useLocationStore';
 import { ResultCard } from './ResultCard';
 import styles from './ResultList.module.css';
 
 export const ResultList: React.FC = () => {
   const { status, getVisibleResults } = useSearchStore();
-  const { location } = useLocationStore();
-
-  const visibleResults = getVisibleResults(location);
+  const visibleResults = getVisibleResults();
 
   if (status === 'idle') {
     return (

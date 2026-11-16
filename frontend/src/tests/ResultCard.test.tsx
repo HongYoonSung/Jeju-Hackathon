@@ -11,7 +11,7 @@ const offlinePlace: PlaceWithDistance = {
   name: '예시마트 노형점',
   price: { amount: 2480, unit_label: '1L', checked_at: '' },
   offline: { address: '제주시 노형동', lat: 33.4846, lng: 126.4783 },
-  distance_m: 1200,
+  road: { distance_m: 1200, duration_s: 240, source: 'osrm' },
   crowd: {
     level: 'high',
     estimated_people: 180,

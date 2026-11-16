@@ -27,6 +27,12 @@ export interface CrowdInfo {
   source: 'model' | 'mock';
 }
 
+export interface RoadMetric {
+  distance_m: number;
+  duration_s: number;
+  source: 'osrm' | 'naver' | 'estimate';
+}
+
 export interface PlaceResult {
   id: string;
   type: 'offline' | 'online';
@@ -35,6 +41,7 @@ export interface PlaceResult {
   price?: PriceInfo | null;
   offline?: OfflinePlace | null;
   online?: OnlinePlace | null;
+  road?: RoadMetric | null;
   crowd?: CrowdInfo | null;
 }
 
@@ -75,6 +82,23 @@ export interface RouteResponse {
   provider: 'estimate' | 'osrm' | 'naver';
 }
 
+export interface MetricsRequest {
+  origin: LatLng;
+  destinations: Array<LatLng & { id: string }>;
+}
+
+export interface MetricResult extends RoadMetric {
+  id: string;
+}
+
+export interface MetricsResponse {
+  metrics: MetricResult[];
+}
+
+export interface AuthUser {
+  id: string;
+}
+
 export interface TransitStep {
   mode: 'walk' | 'bus';
   label: string;
@@ -105,6 +129,4 @@ export interface ApiErrorResponse {
   };
 }
 
-export interface PlaceWithDistance extends PlaceResult {
-  distance_m?: number;
-}
+export type PlaceWithDistance = PlaceResult;

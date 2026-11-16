@@ -1,15 +1,55 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocationStore } from '../../store/useLocationStore';
+import { useSearchStore } from '../../store/useSearchStore';
 import { api } from '../../lib/api';
 import styles from './LocationChip.module.css';
 
 export const LocationChip: React.FC = () => {
   const { location, setLocation } = useLocationStore();
+  const results = useSearchStore((state) => state.results);
+  const setRoadMetrics = useSearchStore((state) => state.setRoadMetrics);
+  const setMetricsLoading = useSearchStore((state) => state.setMetricsLoading);
+  const metricsLoading = useSearchStore((state) => state.metricsLoading);
   const [isOpen, setIsOpen] = useState(false);
   const [addressInput, setAddressInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  const updateLocationAndMetrics = async (
+    nextLocation: typeof location,
+  ): Promise<boolean> => {
+    setLocation(nextLocation);
+    const destinations = results.flatMap((result) =>
+      result.type === 'offline' && result.offline
+        ? [{
+            id: result.id,
+            lat: result.offline.lat,
+            lng: result.offline.lng,
+          }]
+        : [],
+    );
+    if (!destinations.length) return true;
+
+    setRoadMetrics([]);
+    setMetricsLoading(true);
+    setErrorMsg(null);
+    try {
+      const response = await api.metrics({
+        origin: { lat: nextLocation.lat, lng: nextLocation.lng },
+        destinations,
+      });
+      setRoadMetrics(response.metrics);
+      return true;
+    } catch (error) {
+      setErrorMsg(
+        error instanceof Error ? error.message : '도로 거리를 다시 계산하지 못했어요.',
+      );
+      return false;
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
 
   // 외부 클릭 시 팝오버 닫기
   useEffect(() => {
@@ -39,15 +79,15 @@ export const LocationChip: React.FC = () => {
     setErrorMsg(null);
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLoading(false);
-        setLocation({
+      async (pos) => {
+        const updated = await updateLocationAndMetrics({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           label: '현재 위치',
           source: 'gps',
         });
-        setIsOpen(false);
+        setIsLoading(false);
+        if (updated) setIsOpen(false);
       },
       (err) => {
         setIsLoading(false);
@@ -67,23 +107,26 @@ export const LocationChip: React.FC = () => {
 
     try {
       const res = await api.geocode({ address: query });
-      setLocation({
+      const updated = await updateLocationAndMetrics({
         lat: res.lat,
         lng: res.lng,
         label: res.label,
         source: 'address',
       });
+      if (!updated) return;
       setAddressInput('');
       setIsOpen(false);
-    } catch (err: any) {
-      setErrorMsg(err.message || '주소를 찾지 못했어요.');
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : '주소를 찾지 못했어요.',
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className={styles.container} ref={popoverRef}>
+    <div className={styles.container} ref={popoverRef} aria-busy={metricsLoading}>
       <button
         type="button"
         className={styles.chipButton}
@@ -99,6 +142,12 @@ export const LocationChip: React.FC = () => {
           ▾
         </span>
       </button>
+
+      {metricsLoading && (
+        <span className={styles.metricsStatus} role="status">
+          도로 거리를 다시 계산하고 있어요.
+        </span>
+      )}
 
       {isOpen && (
         <div className={styles.popover} role="dialog" aria-label="위치 설정">

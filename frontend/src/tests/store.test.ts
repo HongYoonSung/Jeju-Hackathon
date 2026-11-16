@@ -10,6 +10,7 @@ const mockPlaces: PlaceResult[] = [
     name: '노형마트',
     price: { amount: 3000, unit_label: '1개', checked_at: '' },
     offline: { address: '노형동', lat: 33.4846, lng: 126.4783 },
+    road: { distance_m: 39500, duration_s: 3300, source: 'osrm' },
     online: null,
   },
   {
@@ -19,6 +20,7 @@ const mockPlaces: PlaceResult[] = [
     name: '서귀포마트',
     price: { amount: 2000, unit_label: '1개', checked_at: '' },
     offline: { address: '서귀포', lat: 33.2541, lng: 126.5601 },
+    road: { distance_m: 4200, duration_s: 720, source: 'osrm' },
     online: null,
   },
   {
@@ -32,8 +34,6 @@ const mockPlaces: PlaceResult[] = [
   },
 ];
 
-const userLocation = { lat: 33.4996, lng: 126.5312 }; // 제주시청 부근
-
 describe('useSearchStore Filter and Sort Combinations', () => {
   beforeEach(() => {
     useSearchStore.getState().resetSearch();
@@ -46,23 +46,39 @@ describe('useSearchStore Filter and Sort Combinations', () => {
     store.setTypeFilter('all');
     store.setSortKey('recommend');
 
-    const res = store.getVisibleResults(userLocation);
+    const res = store.getVisibleResults();
     expect(res).toHaveLength(3);
     expect(res.map((r) => r.id)).toEqual(['store_1', 'online_1', 'store_2']);
   });
 
-  // 조합 2: all + distance
-  it('조합 2: 전체 + 거리순 (오프라인 거리순 -> 온라인 뒤에 rank순)', () => {
+  // 조합 2: all + road distance
+  it('조합 2: 전체 + 도로 거리순 (직선거리와 무관하게 온라인은 뒤에 배치)', () => {
     const store = useSearchStore.getState();
     store.setTypeFilter('all');
     store.setSortKey('distance');
 
-    const res = store.getVisibleResults(userLocation);
+    const res = store.getVisibleResults();
     expect(res).toHaveLength(3);
-    // 노형마트가 서귀포마트보다 제주시청에 가까움 -> 노형, 서귀포, 온라인
-    expect(res[0].id).toBe('store_1');
-    expect(res[1].id).toBe('store_2');
+    expect(res[0].id).toBe('store_2');
+    expect(res[1].id).toBe('store_1');
     expect(res[2].id).toBe('online_1');
+  });
+
+  it('도로 측정값이 없는 오프라인 매장은 온라인 결과보다 뒤에 정렬한다', () => {
+    const store = useSearchStore.getState();
+    store.setResults([
+      { ...mockPlaces[0], road: null },
+      mockPlaces[2],
+      mockPlaces[1],
+    ]);
+    store.setTypeFilter('all');
+    store.setSortKey('distance');
+
+    expect(store.getVisibleResults().map((result) => result.id)).toEqual([
+      'store_2',
+      'store_1',
+      'online_1',
+    ]);
   });
 
   // 조합 3: all + price
@@ -71,7 +87,7 @@ describe('useSearchStore Filter and Sort Combinations', () => {
     store.setTypeFilter('all');
     store.setSortKey('price');
 
-    const res = store.getVisibleResults(userLocation);
+    const res = store.getVisibleResults();
     expect(res).toHaveLength(3);
     // 2000(store_2) -> 2500(online_1) -> 3000(store_1)
     expect(res.map((r) => r.id)).toEqual(['store_2', 'online_1', 'store_1']);
@@ -83,7 +99,7 @@ describe('useSearchStore Filter and Sort Combinations', () => {
     store.setTypeFilter('offline');
     store.setSortKey('recommend');
 
-    const res = store.getVisibleResults(userLocation);
+    const res = store.getVisibleResults();
     expect(res).toHaveLength(2);
     expect(res.map((r) => r.id)).toEqual(['store_1', 'store_2']);
   });
@@ -94,7 +110,7 @@ describe('useSearchStore Filter and Sort Combinations', () => {
     store.setTypeFilter('offline');
     store.setSortKey('price');
 
-    const res = store.getVisibleResults(userLocation);
+    const res = store.getVisibleResults();
     expect(res).toHaveLength(2);
     expect(res.map((r) => r.id)).toEqual(['store_2', 'store_1']);
   });
@@ -105,7 +121,7 @@ describe('useSearchStore Filter and Sort Combinations', () => {
     store.setTypeFilter('online');
     store.setSortKey('recommend');
 
-    const res = store.getVisibleResults(userLocation);
+    const res = store.getVisibleResults();
     expect(res).toHaveLength(1);
     expect(res[0].id).toBe('online_1');
   });

@@ -152,11 +152,11 @@ export const RoutePanel: React.FC<RoutePanelProps> = ({ destination }) => {
       {activeTab === 'driving' && route && (
         <div className={styles.resultBox}>
           <span className={styles.summaryText}>
-            도로 거리 {formatDistance(route.distance_m)} · 자동차 약{' '}
-            {formatDuration(route.duration_s)}
+            {route.provider === 'estimate' ? '추정 거리' : '도로 거리'}{' '}
+            {formatDistance(route.distance_m)} · 자동차 약 {formatDuration(route.duration_s)}
           </span>
           {route.provider === 'estimate' && (
-            <span className={styles.estimateTag}>(추정)</span>
+            <span className={styles.estimateTag}>직선 기반 추정값이에요.</span>
           )}
         </div>
       )}

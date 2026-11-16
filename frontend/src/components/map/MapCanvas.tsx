@@ -88,7 +88,7 @@ export const MapCanvas: React.FC = () => {
     useSearchStore();
   const { location } = useLocationStore();
 
-  const visibleResults = getVisibleResults(location);
+  const visibleResults = getVisibleResults();
   const offlinePlaces = visibleResults.filter(
     (r) => r.type === 'offline' && r.offline
   );

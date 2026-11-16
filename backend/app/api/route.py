@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 from app.errors import AppError
 from app.providers import get_router
-from app.schemas import RouteRequest, RouteResponse
+from app.schemas import MetricsRequest, MetricsResponse, RouteRequest, RouteResponse
 
 router = APIRouter()
 
@@ -17,3 +17,11 @@ async def route_endpoint(req: RouteRequest):
             "경로를 계산하지 못했어요.",
         )
     return result
+
+
+@router.post("/metrics", response_model=MetricsResponse)
+async def metrics_endpoint(req: MetricsRequest):
+    router_service = get_router()
+    destinations = [(item.id, item) for item in req.destinations]
+    metrics = await router_service.metrics(req.origin, destinations)
+    return MetricsResponse(metrics=metrics)

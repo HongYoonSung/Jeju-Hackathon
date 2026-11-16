@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { useAuthStore } from '../store/useAuthStore';
 import styles from './Auth.module.css';
 
 export const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
+  const setUser = useAuthStore((state) => state.setUser);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -41,10 +44,13 @@ export const LoginPage: React.FC = () => {
     setServerNotice(null);
 
     try {
-      await api.login({ id: username, password });
-    } catch {
-      // 서버는 501 반환 -> "준비 중인 기능입니다." 표시 (SPEC 5.2)
-      setServerNotice('준비 중인 기능입니다.');
+      const user = await api.login({ id: username.trim(), password });
+      setUser(user);
+      navigate('/', { replace: true });
+    } catch (error) {
+      setServerNotice(
+        error instanceof Error ? error.message : '로그인에 실패했어요.',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -86,6 +92,7 @@ export const LoginPage: React.FC = () => {
             <input
               id="login-pw"
               type="password"
+              maxLength={128}
               className={styles.input}
               value={password}
               onChange={(e) => setPassword(e.target.value)}

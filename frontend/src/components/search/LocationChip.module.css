@@ -136,3 +136,17 @@
   color: var(--crowd-very-high);
   font-size: var(--fs-caption);
 }
+
+.metricsStatus {
+  position: absolute;
+  top: calc(100% + var(--sp-1));
+  left: 0;
+  z-index: var(--z-popover);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-soft);
+  font-size: var(--fs-caption);
+  white-space: nowrap;
+}

@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -10,12 +11,21 @@ class Settings(BaseSettings):
 
     # 지도/경로
     GEOCODER: str = "mock"  # mock | nominatim | naver
-    ROUTER: str = "estimate"  # estimate | osrm | naver
-    OSRM_BASE_URL: str = ""
+    ROUTER: str = "osrm"  # osrm | naver | estimate
+    OSRM_BASE_URL: str = "http://127.0.0.1:5000"
+    ROUTER_TIMEOUT_S: float = 5.0
     NAVER_CLIENT_ID: str = ""
     NAVER_CLIENT_SECRET: str = ""
 
     # 보안/동작
+    AUTH_DB_PATH: str = str(
+        Path(__file__).resolve().parents[2]
+        / "backend"
+        / "data"
+        / "auth.sqlite3"
+    )
+    AUTH_COOKIE_SECURE: bool = False
+    AUTH_SESSION_TTL_HOURS: int = 168
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
     ALLOWED_ONLINE_HOSTS: str = (
         "www.coupang.com,search.shopping.naver.com,search.11st.co.kr,browse.gmarket.co.kr"

@@ -68,8 +68,12 @@ bash scripts/build_and_serve.sh
 | `AI_ENDPOINT` | `""` | `local` AI 모델 연동 시 엔드포인트 URL |
 | `AI_TIMEOUT_S` | `60` | AI 검색 요청 타임아웃 (초) |
 | `GEOCODER` | `mock` | 주소 검색 제공자 (`mock`, `nominatim`, `naver`) |
-| `ROUTER` | `estimate` | 경로 계산 제공자 (`estimate`, `osrm`, `naver`) |
-| `OSRM_BASE_URL` | `""` | 자체 OSRM 서버 URL (사용 시) |
+| `ROUTER` | `osrm` | 경로 계산 제공자 (`osrm`, `naver`, `estimate`) |
+| `OSRM_BASE_URL` | `http://127.0.0.1:5000` | 자체 OSRM 서버 URL |
+| `ROUTER_TIMEOUT_S` | `5` | 도로 경로 요청 타임아웃 (초) |
+| `AUTH_DB_PATH` | `backend/data/auth.sqlite3` | 회원 및 세션 SQLite 저장 경로 |
+| `AUTH_COOKIE_SECURE` | `false` | HTTPS 배포에서는 `true`로 설정 |
+| `AUTH_SESSION_TTL_HOURS` | `168` | 로그인 세션 유지 시간 |
 | `NAVER_CLIENT_ID` | `""` | 네이버 클라우드 플랫폼 Client ID |
 | `NAVER_CLIENT_SECRET` | `""` | 네이버 클라우드 플랫폼 Client Secret |
 | `ALLOWED_ORIGINS` | `http://localhost:5173...` | CORS 허용 오리진 목록 |
@@ -82,6 +86,8 @@ bash scripts/build_and_serve.sh
 ## 5. 외부 서비스 의존성 및 참고사항
 
 - **지도 타일**: 기본값으로 OpenStreetMap 타일을 사용합니다 (`&copy; OpenStreetMap contributors`). 폐쇄망 환경에서는 로컬 타일 캐시 서버 주소로 변경하여 구동할 수 있습니다.
+- **도로 거리·시간**: `ROUTER=osrm`과 로컬 OSRM 서버(`OSRM_BASE_URL`)를 사용합니다. OSRM에 연결할 수 없는 경우 직선거리 기반 추정값으로 폴백하고 결과에 `(추정)`으로 표시합니다. OSRM 미설치 상태에서 실제 도로 경로를 얻을 수는 없습니다.
+- **회원 계정**: 회원가입 계정은 SQLite에 저장하며 비밀번호는 PBKDF2 해시로 보관합니다. 로그인 세션은 HttpOnly 쿠키로 유지됩니다. HTTPS 배포 시 `AUTH_COOKIE_SECURE=true`로 설정하세요.
 - **매장 데이터 좌표 안내**: `backend/app/data/mock/stores.json`에 포함된 매장 좌표는 기능 검증 및 시연을 위한 **예시 좌표**이며, 실제 매장 위치가 아닙니다.
 - **온라인몰 딥링크**: 온라인 쇼핑몰(쿠팡, 네이버, 11번가, G마켓 등)의 검색 URL 템플릿은 외부 사이트 정책 변경에 따라 달라질 수 있으므로 **구현 시 실제 동작 확인이 필요**합니다.
 - **AI 슬롯 확장**: 사용자가 직접 학습시킨 로컬 모델은 `backend/app/ai/local_model_agent.py`의 `LocalModelAgent` 클래스에 연결할 수 있습니다.

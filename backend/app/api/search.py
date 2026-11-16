@@ -5,8 +5,9 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, status
 from app.config import settings
 from app.errors import AppError
-from app.schemas import SearchRequest, SearchResponse, PlaceResult
+from app.schemas import LatLng, SearchRequest, SearchResponse, PlaceResult
 from app.ai.registry import get_ai_agent
+from app.providers import get_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -100,4 +101,20 @@ async def search_endpoint(req: SearchRequest):
 
     # 4. 최대 MAX_RESULTS개로 자름 (SPEC 6.3)
     res.results = valid_results[: settings.MAX_RESULTS]
+
+    offline_results = [
+        item for item in res.results if item.type == "offline" and item.offline
+    ]
+    if offline_results:
+        origin = req.user_location or LatLng(lat=33.4996, lng=126.5312)
+        destinations = [
+            (item.id, LatLng(lat=item.offline.lat, lng=item.offline.lng))
+            for item in offline_results
+            if item.offline
+        ]
+        road_metrics = await get_router().metrics(origin, destinations)
+        metrics_by_id = {metric.id: metric for metric in road_metrics}
+        for item in offline_results:
+            item.road = metrics_by_id.get(item.id)
+
     return res

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Literal, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class LatLng(BaseModel):
@@ -32,6 +32,12 @@ class CrowdInfo(BaseModel):
     source: Literal["model", "mock"]
 
 
+class RoadMetric(BaseModel):
+    distance_m: int
+    duration_s: int
+    source: Literal["osrm", "naver", "estimate"]
+
+
 class PlaceResult(BaseModel):
     id: str
     type: Literal["offline", "online"]
@@ -40,6 +46,7 @@ class PlaceResult(BaseModel):
     price: Optional[PriceInfo] = None
     offline: Optional[OfflinePlace] = None
     online: Optional[OnlinePlace] = None
+    road: Optional[RoadMetric] = None
     crowd: Optional[CrowdInfo] = None
 
 
@@ -96,6 +103,43 @@ class RouteResponse(BaseModel):
     duration_s: int
     geometry: List[List[float]]  # [[lat, lng], ...]
     provider: Literal["estimate", "osrm", "naver"]
+
+
+class MetricDestination(LatLng):
+    id: str
+
+
+class MetricsRequest(BaseModel):
+    origin: LatLng
+    destinations: List[MetricDestination] = Field(max_length=30)
+
+
+class MetricResult(RoadMetric):
+    id: str
+
+
+class MetricsResponse(BaseModel):
+    metrics: List[MetricResult]
+
+
+class LoginRequest(BaseModel):
+    id: str = Field(min_length=4, max_length=20, pattern=r"^[a-zA-Z0-9]+$")
+    password: str = Field(min_length=8, max_length=128)
+
+
+class SignupRequest(LoginRequest):
+    password_confirm: str = Field(alias="passwordConfirm", min_length=8, max_length=128)
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="after")
+    def validate_password_confirmation(self):
+        if self.password != self.password_confirm:
+            raise ValueError("비밀번호가 일치하지 않습니다.")
+        return self
+
+
+class AuthResponse(BaseModel):
+    id: str
 
 
 class TransitStep(BaseModel):

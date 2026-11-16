@@ -7,6 +7,9 @@ import {
   RouteResponse,
   TransitRequest,
   TransitResponse,
+  MetricsRequest,
+  MetricsResponse,
+  AuthUser,
   ApiErrorResponse,
 } from '../types/api';
 
@@ -32,6 +35,7 @@ async function request<T>(
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
+      credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
         ...(options.headers || {}),
@@ -87,21 +91,34 @@ export const api = {
       body: JSON.stringify(req),
     }),
 
+  metrics: (req: MetricsRequest): Promise<MetricsResponse> =>
+    request<MetricsResponse>('/api/metrics', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+
   transit: (req: TransitRequest): Promise<TransitResponse> =>
     request<TransitResponse>('/api/transit', {
       method: 'POST',
       body: JSON.stringify(req),
     }),
 
-  login: (data: { id: string; password: string }) =>
-    request('/api/auth/login', {
+  login: (data: { id: string; password: string }): Promise<AuthUser> =>
+    request<AuthUser>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  signup: (data: { id: string; password: string; passwordConfirm: string }) =>
-    request('/api/auth/signup', {
+  signup: (data: { id: string; password: string; passwordConfirm: string }): Promise<AuthUser> =>
+    request<AuthUser>('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  me: (): Promise<AuthUser> => request<AuthUser>('/api/auth/me'),
+
+  logout: (): Promise<void> =>
+    request<void>('/api/auth/logout', {
+      method: 'POST',
     }),
 };

@@ -6,10 +6,17 @@ import { LocationChip } from './LocationChip';
 import styles from './SearchBar.module.css';
 
 export const SearchBar: React.FC = () => {
-  const { status, errorMessage, setStatus, setErrorMessage, setResults } =
-    useSearchStore();
+  const {
+    status,
+    errorMessage,
+    query: storedQuery,
+    setQuery,
+    setStatus,
+    setErrorMessage,
+    setResults,
+  } = useSearchStore();
   const { location } = useLocationStore();
-  const [inputVal, setInputVal] = useState('');
+  const [inputVal, setInputVal] = useState(storedQuery);
 
   const isLoading = status === 'loading';
 
@@ -29,40 +36,44 @@ export const SearchBar: React.FC = () => {
         user_location: { lat: location.lat, lng: location.lng },
         client_time: new Date().toISOString(),
       });
+      setQuery(query);
       setResults(res.results);
-    } catch (err: any) {
+    } catch (err) {
       setStatus('error');
-      setErrorMessage(err.message || '검색 중 오류가 발생했습니다.');
+      setErrorMessage(
+        err instanceof Error ? err.message : '검색 중 오류가 발생했어요.',
+      );
     }
   };
 
   return (
     <div className={styles.searchBarContainer}>
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.inputWrapper}>
-          <input
-            type="text"
-            className={styles.input}
-            placeholder="찾고 싶은 상품을 말해 주세요 (예: 우유 1L 제일 싼 곳)"
-            maxLength={200}
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            disabled={isLoading}
-            aria-label="상품 검색어"
-          />
-          <button
-            type="submit"
-            className={styles.searchButton}
-            disabled={isLoading || !inputVal.trim()}
-          >
-            {isLoading ? '검색 중…' : '검색'}
-          </button>
-        </div>
-
+      <div className={styles.form}>
+        <form onSubmit={handleSubmit} className={styles.searchForm}>
+          <div className={styles.inputWrapper}>
+            <input
+              type="text"
+              className={styles.input}
+              placeholder="찾고 싶은 상품을 말해 주세요 (예: 우유 1L 제일 싼 곳)"
+              maxLength={200}
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              disabled={isLoading}
+              aria-label="상품 검색어"
+            />
+            <button
+              type="submit"
+              className={styles.searchButton}
+              disabled={isLoading || !inputVal.trim()}
+            >
+              {isLoading ? '검색 중…' : '검색'}
+            </button>
+          </div>
+        </form>
         <div className={styles.locationWrapper}>
           <LocationChip />
         </div>
-      </form>
+      </div>
 
       {/* 에러 한 줄 메시지 (SPEC 7.7) */}
       {errorMessage && (

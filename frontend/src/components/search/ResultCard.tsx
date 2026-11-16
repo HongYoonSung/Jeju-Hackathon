@@ -4,7 +4,7 @@ import { useSearchStore } from '../../store/useSearchStore';
 import { TypeBadge } from './TypeBadge';
 import { CrowdBadge } from './CrowdBadge';
 import { RoutePanel } from './RoutePanel';
-import { formatDistance, formatPrice } from '../../lib/format';
+import { formatDistance, formatDuration, formatPrice } from '../../lib/format';
 import { safeUrl } from '../../lib/safeUrl';
 import styles from './ResultCard.module.css';
 
@@ -76,8 +76,16 @@ export const ResultCard: React.FC<ResultCardProps> = ({
         {isOffline && place.offline && (
           <span className={styles.metaText}>
             {place.offline.address}
-            {place.distance_m !== undefined && (
-              <> · {formatDistance(place.distance_m)}</>
+            {place.road && (
+              <>
+                {' · '}
+                {place.road.source === 'estimate' && '약 '}
+                {formatDistance(place.road.distance_m)}
+                {' · '}
+                {place.road.source === 'estimate' && '약 '}
+                {formatDuration(place.road.duration_s)}
+                {place.road.source === 'estimate' && ' (추정)'}
+              </>
             )}
           </span>
         )}

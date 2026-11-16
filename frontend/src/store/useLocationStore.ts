@@ -8,7 +8,9 @@ export interface UserLocation extends LatLng {
 
 interface LocationState {
   location: UserLocation;
+  hasRequestedGps: boolean;
   setLocation: (loc: UserLocation) => void;
+  markGpsRequested: () => void;
 }
 
 // SPEC 5.3.2 [기본값] 초기 위치는 제주시청
@@ -20,5 +22,7 @@ export const useLocationStore = create<LocationState>((set) => ({
     label: '제주시청 부근',
     source: 'default',
   },
+  hasRequestedGps: false,
   setLocation: (loc) => set({ location: loc }),
+  markGpsRequested: () => set({ hasRequestedGps: true }),
 }));

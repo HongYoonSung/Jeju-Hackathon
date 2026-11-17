@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 from fastapi import APIRouter, status
+from ai.agent_runner import GeminiAPIError
 from app.config import settings
 from app.errors import AppError
 from app.schemas import LatLng, SearchRequest, SearchResponse, PlaceResult
@@ -47,6 +48,9 @@ async def search_endpoint(req: SearchRequest):
         raise AppError(status.HTTP_504_GATEWAY_TIMEOUT, "AI_TIMEOUT", "AI 응답 시간이 초과되었습니다.")
     except NotImplementedError:
         raise AppError(status.HTTP_503_SERVICE_UNAVAILABLE, "AI_NOT_READY", "AI가 아직 연결되지 않았어요.")
+    except GeminiAPIError as e:
+        logger.warning("AI provider request failed: %s", e.code)
+        raise AppError(e.status_code, e.code, e.user_message)
     except Exception as e:
         logger.error("AI agent search failed: %s", type(e).__name__)
         raise AppError(status.HTTP_500_INTERNAL_SERVER_ERROR, "SERVER_ERROR", "검색 처리 중 오류가 발생했습니다.")

@@ -4,12 +4,12 @@
 
 ## 1. 사용한 AI 모델 및 슬롯 구조
 
-- **현재 백엔드 AI 엔진**: `MockAgent` (`AI_BACKEND=mock`)
-  - 규칙 기반 결정적(deterministic) 가짜 AI 엔진으로 개발 및 데모 테스트 수행
-- **로컬 학습 모델 슬롯 (`LocalModelAgent`)**:
-  - 파일 위치: `backend/app/ai/local_model_agent.py`
-  - 연결 방식: 센터 PC 내부의 로컬 LLM / 자체 학습 모델 또는 로컬 HTTP 서빙 엔드포인트(`AI_ENDPOINT`)
-  - 미연결 시 `503 AI_NOT_READY` 반환 처리
+- **기본 백엔드 AI 엔진**: `LocalModelAgent` (`AI_BACKEND=local`)
+  - `ai/agent_runner.py`의 제주 장바구니 분석을 검색 API 결과와 연결합니다.
+  - 질의 해석·요약에 Gemini API를 사용하며 키는 `ai/.env`의 `GEMINI_API_KEY`에서 읽습니다. 제공된 코드는 로컬 가중치 모델 추론 방식은 아닙니다.
+- **테스트용 대체 엔진**: `MockAgent` (`AI_BACKEND=mock`)
+  - 규칙 기반 결정적(deterministic) 예시 결과를 반환합니다.
+  - LocalModelAgent 연결 실패 시 Mock으로 조용히 대체하지 않습니다.
 
 ## 2. AI 활용 범위
 
@@ -22,12 +22,13 @@
 
 ## 3. 외부 API 및 서비스 연동
 
-- **지도 타일**: OpenStreetMap 타일 서버
+- **지도**: 네이버 Dynamic Map을 우선 사용하며, 키·로딩 실패 시 설정에 따라 OpenStreetMap 기반 Leaflet 지도로 전환
 - **주소 지오코딩 / 경로 안내**:
   - 기본: 내장 Mock 및 도로거리 추정(`estimate`) 알고리즘
   - 선택(환경변수 설정 시): Nominatim / Naver Maps API / OSRM
+- **AI 서비스**: Gemini API (질의 해석·요약). Gemini에 검색 질의가 전달됩니다.
 
 ## 4. 외부 코드 및 오픈소스 라이브러리
 
-- 백엔드: FastAPI, Uvicorn, Pydantic, HTTPX, Pytest
+- 백엔드: FastAPI, Uvicorn, Pydantic, HTTPX, Requests, Pandas, Pytest
 - 프론트엔드: React, Vite, React Router, TanStack Query, Zustand, Leaflet, React-Leaflet, Pretendard

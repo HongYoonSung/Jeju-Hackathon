@@ -11,6 +11,7 @@ export const SearchBar: React.FC = () => {
     errorMessage,
     query: storedQuery,
     setQuery,
+    setAgentBriefing,
     setStatus,
     setErrorMessage,
     setResults,
@@ -27,6 +28,7 @@ export const SearchBar: React.FC = () => {
       return;
     }
 
+    setAgentBriefing(null);
     setStatus('loading');
     setErrorMessage(null);
 
@@ -38,6 +40,7 @@ export const SearchBar: React.FC = () => {
       });
       setQuery(query);
       setResults(res.results);
+      setAgentBriefing(res.agent_briefing ?? null);
     } catch (err) {
       setStatus('error');
       setErrorMessage(

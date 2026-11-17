@@ -25,6 +25,8 @@ data/raw/
 backend/data/*.sqlite3
 backend/data/*.db
 *.csv
+!ai/data/대규모점포정보.csv
+!ai/data/제주특별자치도 상가(상권) 정보.csv
 *.parquet
 *.gguf
 *.safetensors

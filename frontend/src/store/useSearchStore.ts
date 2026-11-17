@@ -15,6 +15,7 @@ interface SearchState {
   status: SearchStatus;
   errorMessage: string | null;
   query: string;
+  agentBriefing: string | null;
   results: PlaceResult[];
   sortKey: SortKey;
   typeFilter: TypeFilter;
@@ -24,6 +25,7 @@ interface SearchState {
   metricsLoading: boolean;
 
   setQuery: (q: string) => void;
+  setAgentBriefing: (briefing: string | null) => void;
   setStatus: (status: SearchStatus) => void;
   setErrorMessage: (msg: string | null) => void;
   setResults: (results: PlaceResult[]) => void;
@@ -43,6 +45,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   status: 'idle',
   errorMessage: null,
   query: '',
+  agentBriefing: null,
   results: [],
   sortKey: 'recommend',
   typeFilter: 'all',
@@ -52,11 +55,13 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   metricsLoading: false,
 
   setQuery: (q) => set({ query: q }),
+  setAgentBriefing: (agentBriefing) => set({ agentBriefing }),
   setStatus: (status) => set({ status }),
   setErrorMessage: (msg) => set({ errorMessage: msg }),
   setResults: (results) =>
     set({
       results,
+      agentBriefing: null,
       status: 'success',
       errorMessage: null,
       selectedId: null,
@@ -92,6 +97,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       status: 'idle',
       errorMessage: null,
       query: '',
+      agentBriefing: null,
       results: [],
       selectedId: null,
       route: null,

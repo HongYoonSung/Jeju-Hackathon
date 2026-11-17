@@ -71,6 +71,7 @@ class SearchResponse(BaseModel):
     query: str
     generated_at: str
     results: List[PlaceResult]
+    agent_briefing: Optional[str] = Field(default=None, max_length=2000)
 
 
 class GeocodeRequest(BaseModel):

@@ -7,6 +7,7 @@ from app.schemas import SearchResponse, PlaceResult, OnlinePlace, PriceInfo
 
 @pytest.mark.asyncio
 async def test_search_normal_and_crowd_filled(monkeypatch):
+    monkeypatch.setattr(settings, "AI_BACKEND", "mock")
     monkeypatch.setattr(settings, "ROUTER", "estimate")
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -45,6 +46,7 @@ async def test_search_empty_query_422():
 
 @pytest.mark.asyncio
 async def test_search_disallowed_deeplink_filtered(monkeypatch):
+    monkeypatch.setattr(settings, "AI_BACKEND", "mock")
     monkeypatch.setattr(settings, "ROUTER", "estimate")
     # 가짜 에이전트가 허용되지 않은 deeplink_url을 반환하도록 주입
     from app.ai.registry import get_ai_agent
@@ -82,6 +84,8 @@ async def test_search_disallowed_deeplink_filtered(monkeypatch):
 @pytest.mark.asyncio
 async def test_search_local_agent_not_ready(monkeypatch):
     monkeypatch.setattr(settings, "AI_BACKEND", "local")
+    from app.ai import local_model_agent
+    monkeypatch.setattr(local_model_agent, "GEMINI_API_KEY", "")
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -90,3 +94,27 @@ async def test_search_local_agent_not_ready(monkeypatch):
         data = resp.json()
         assert data["error"]["code"] == "AI_NOT_READY"
         assert data["error"]["message"] == "AI가 아직 연결되지 않았어요."
+
+
+@pytest.mark.asyncio
+async def test_search_gemini_unavailable_is_reported_as_503(monkeypatch):
+    from ai.agent_runner import GeminiAPIError
+    from app.ai.local_model_agent import LocalModelAgent
+
+    monkeypatch.setattr(settings, "AI_BACKEND", "local")
+
+    async def unavailable(self, req):
+        raise GeminiAPIError(
+            503,
+            "AI_SERVICE_UNAVAILABLE",
+            "AI 서비스가 혼잡해 응답하지 않습니다. 잠시 후 다시 시도해 주세요.",
+        )
+
+    monkeypatch.setattr(LocalModelAgent, "search", unavailable)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/api/search", json={"query": "우유"})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "AI_SERVICE_UNAVAILABLE"

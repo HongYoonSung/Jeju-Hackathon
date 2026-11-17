@@ -26,7 +26,7 @@ export class ApiError extends Error {
 async function request<T>(
   url: string,
   options: RequestInit = {},
-  timeoutMs = 70000
+  timeoutMs = 120000
 ): Promise<T> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);

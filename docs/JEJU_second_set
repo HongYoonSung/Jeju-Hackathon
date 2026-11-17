@@ -1,0 +1,770 @@
+# 제주얼마꽈 — 구현 명세서 (SPEC v0.2)
+
+> **어떤 AI 코딩 모델에게 전달해도 같은 결과물이 나오도록** 작성된 단일 명세서입니다. v0.1을 **완전히 대체**합니다.
+> 💡 `📚 왜?` 박스는 사람이 읽고 공부하기 위한 설명이며, 구현 AI는 무시해도 됩니다.
+
+---
+
+## 0. AI 구현자에게 (반드시 먼저 읽을 것)
+
+### 0.1 절대 규칙
+1. **이 문서에 적힌 기능만 구현한다.** 부록 B(승인 대기 제안)는 **절대 구현하지 않는다.** 임의로 기능·화면·버튼·문구를 추가하지 않는다.
+2. **AI 모델 연동부는 구현하지 않는다.** 6장의 인터페이스와 Mock 구현체만 만든다. 실제 모델 호출은 `NotImplementedError` 스텁으로 둔다.
+3. 파일은 **생략 없이 전체**를 출력한다. (`// ...생략` 금지)
+4. **API Key·비밀번호·토큰을 코드에 쓰지 않는다.** 설정은 환경변수(`.env`)로만 받고 `.env.example`만 제공한다.
+5. 런타임에 **외부 CDN을 쓰지 않는다.** (폰트·아이콘·라이브러리 모두 npm 번들. 센터 PC가 폐쇄망일 수 있음)
+6. 모호한 부분은 `[기본값]`을 쓰고 코드 주석에 `// SPEC-DEFAULT: <id>`를 남긴다.
+7. **거리·시간을 직선거리로 계산해 "정상 값"처럼 표시하지 않는다.** 도로 기반 값(OSRM 등)이 기본이며, 직선 기반 폴백은 반드시 `(추정)`으로 표기한다.
+8. 토스(Toss)의 로고·폰트(Toss Product Sans)·이미지 등 **상표/독점 자산을 사용하지 않는다.** 스타일(여백·둥근 모서리·타이포 위계·톤)만 참고한다.
+9. 구현 순서는 **14장**을 따르고, 단계마다 검증 명령을 통과시킨다.
+
+### 0.2 프로젝트 한 줄 정의
+첫 화면에는 **입력칸 하나**만 있다. 도민이 "노형동 근처에서 우유 제일 싼 곳 알려줘"처럼 말하면 **에이전트가 의도를 해석**해, 화면이 **지도 + 가격표**로 전환되며 답을 알려 준다. 오프라인 매장은 **도로 기준 거리·시간**, **혼잡도**, **내비게이션 형식의 길안내**까지, 온라인몰은 **검색된 상태의 사이트 이동**을 제공한다. 서비스명은 **제주얼마꽈**.
+
+### 0.3 우선순위
+**P1** 핵심(먼저) / **P2** 후순위 / **P3** 선택(인터페이스 + Mock + 비활성 UI까지만)
+
+---
+
+## 1. v0.1 → v0.2 변경 요약
+
+| 구분 | 내용 |
+|---|---|
+| 개선 | 거리: 직선거리 → **도로 기준 거리·시간**(OSRM, 매트릭스 일괄 계산) + **턴 바이 턴 길안내** |
+| 추가 | 시작 화면: **GPT형 입력칸 하나** → 제출 시 **지도·가격표 화면으로 전환** |
+| 추가 | 에이전트 응답에 **해석(interpretation)·답변문·화면 힌트(view_hint)** 포함 (정렬·필터·초점 매장을 에이전트가 정함) |
+| 추가 | **가격표** 보기(목록/가격표 탭) |
+| 변경 | 디자인: 제주데이터허브 톤 → **토스 스타일**(큰 타이포, 둥근 카드, 여백, 해요체 문구, 단일 포커스) |
+| 변경 | 홈의 "제주 풍경 사진 영역(F-01)" 삭제 → GPT형 랜딩으로 대체 |
+| 변경 | 라우트: `/search` 삭제(`/`로 통합, 301 대신 클라이언트 리다이렉트), 길찾기는 목록 아코디언 → **전용 길안내 화면** |
+| 흡수 | v0.1의 B-04(홈 검색 진입)는 랜딩으로 해소, B-01은 **최소 로딩 표시**만 본문 반영 |
+
+---
+
+## 2. 기능 요구사항 (추적 ID)
+
+| ID | 우선순위 | 내용 | 구현 위치 |
+|---|---|---|---|
+| F-01 | P1 | **GPT형 랜딩**(입력칸만) → 제출 시 결과 화면 전환 | `MainPage`, `LandingInput` |
+| F-02 | P2 | 아이디 로그인 / 회원가입 (UI 전용) | `LoginPage`, `SignupPage` |
+| F-03 | P1 | 에이전트가 질의를 **해석**하고 답변문·화면 힌트·결과 반환 (되묻기 포함) | `/api/search`, `AgentSummary` |
+| F-04 | P1 | 결과를 좌측 패널에 순서대로 나열, 온라인=`사이트` / 오프라인=`매장` | `ResultList`, `TypeBadge` |
+| F-05 | P1 | 분류 버튼(거리순·가격순·오프라인/온라인) | `ClassificationBar` |
+| F-06 | P1 | 오프라인 매장 클릭 → 지도에서 위치 표시 | `ResultCard`, `MapCanvas` |
+| F-07 | P1 | **도로 기반 길안내**: 출발 주소 입력 → 경로선 + 거리·시간 + 단계별 안내 | `RouteView`, `/api/route` |
+| F-08 | P1 | 온라인몰 클릭 → 검색된 상태로 사이트 이동 | `ResultCard`, `safeUrl` |
+| F-09 | P1 | 매장명 옆 혼잡도 색상(빨강/주황/노랑/초록) + 인원수 | `CrowdBadge` |
+| F-10 | P3 | 대중교통 길안내 | `/api/transit`, `RouteView` 비활성 탭 |
+| F-11 | P1 | **도로 기준 거리·시간** 일괄 계산(목록·정렬·가격표에 사용) | `/api/metrics`, `routing/` |
+| F-12 | P1 | **가격표** 보기 | `PriceTable` |
+
+---
+
+## 3. 기술 스택 (고정)
+
+| 영역 | 선택 | 이유 |
+|---|---|---|
+| 프론트 | Vite + React 18 + TypeScript | |
+| 라우팅 | react-router-dom v6 | |
+| 서버상태 | @tanstack/react-query v5 | |
+| 클라이언트 상태 | zustand v4 | 단계(phase)·선택·정렬 등 |
+| 지도 | leaflet 1.9 + react-leaflet 4 | 타일 URL만 바꿔 폐쇄망 대응 |
+| 아이콘 | lucide-react | npm 번들, CDN 불필요 |
+| 스타일 | CSS Modules + CSS 변수(토큰) | UI 라이브러리 의존 없음 |
+| 폰트 | `@fontsource-variable/pretendard` 또는 `@fontsource/pretendard` | 셀프호스팅 |
+| 화면 전환 | **View Transitions API**(`document.startViewTransition`), 미지원 시 즉시 전환 | 입력칸이 위로 부드럽게 이동하는 GPT형 연출 |
+| 백엔드 | Python 3.11 + FastAPI + Uvicorn + Pydantic v2 + httpx | 학습 모델(Python)과 직접 연결 |
+| **경로 엔진** | **OSRM (자체 호스팅, 제주 OSM 데이터)** | 인터넷 없이 도로 기준 거리·시간·턴 안내 |
+| 테스트 | pytest / vitest + @testing-library/react | |
+| 배포 | `npm run build` → FastAPI가 `frontend/dist` 서빙(프로세스 1개) + OSRM 컨테이너/바이너리 1개 | |
+
+> 📚 **왜 OSRM인가?** "길 따라 계산"하려면 도로망 그래프에서 최단경로를 구하는 엔진이 필요합니다. 네이버·카카오 API는 정확하고 교통상황도 반영하지만 인터넷·키·호출 제한이 필요해 폐쇄망 센터 PC에선 위험합니다. OSRM은 OpenStreetMap 도로 데이터를 내 PC에 올려 두고 쓰므로 **오프라인으로 거리·시간·턴 안내**가 가능합니다. 대신 **실시간 교통은 반영하지 못합니다**(자유 흐름 기준 소요시간). 이 한계는 화면에 `예상` 문구로 반영합니다.
+
+---
+
+## 4. 폴더 구조 (이 구조 그대로 생성)
+
+```
+jeju-eolmakkwa/
+├─ README.md
+├─ .env.example
+├─ docker-compose.osrm.yml
+├─ scripts/
+│  ├─ dev.sh
+│  ├─ build_and_serve.sh
+│  └─ osrm_prepare.sh            # 제주 OSM 추출 + OSRM 전처리 (12.3)
+├─ docs/  DATA_USAGE.md  AI_DISCLOSURE.md  USER_MANUAL.md
+├─ osrm-data/                    # .gitignore 대상 (대용량)
+├─ backend/
+│  ├─ requirements.txt
+│  ├─ app/
+│  │  ├─ main.py  config.py  errors.py  schemas.py
+│  │  ├─ api/  health.py  search.py  metrics.py  geocode.py  route.py  transit.py  auth.py
+│  │  ├─ ai/   base.py  mock_agent.py  local_model_agent.py  registry.py
+│  │  ├─ providers/
+│  │  │  ├─ geocode_base.py  geocode_mock.py  geocode_nominatim.py  geocode_naver.py
+│  │  │  └─ router_base.py  router_osrm.py  router_estimate.py  router_naver.py  router_fallback.py
+│  │  ├─ routing/ instructions_ko.py      # OSRM maneuver → 한국어 안내
+│  │  ├─ utils/geo.py
+│  │  └─ data/mock/ stores.json  online_malls.json  landmarks.json
+│  └─ tests/ test_search.py test_metrics.py test_route.py test_instructions_ko.py test_geocode.py test_mock_agent.py
+└─ frontend/
+   ├─ package.json  vite.config.ts  tsconfig.json  index.html
+   └─ src/
+      ├─ main.tsx  App.tsx
+      ├─ styles/ tokens.css  global.css
+      ├─ types/api.ts
+      ├─ lib/ api.ts  format.ts  crowd.ts  safeUrl.ts  geo.ts  viewTransition.ts  actionIcon.ts
+      ├─ store/ useAppStore.ts
+      ├─ components/
+      │  ├─ common/ Logo.tsx  Button.tsx  Spinner.tsx  CountUp.tsx
+      │  ├─ landing/ LandingInput.tsx
+      │  ├─ layout/ TopBar.tsx
+      │  ├─ panel/ AgentSummary.tsx  LocationChip.tsx  ViewTabs.tsx  ClassificationBar.tsx
+      │  │         ResultList.tsx  ResultCard.tsx  PriceTable.tsx  TypeBadge.tsx  CrowdBadge.tsx
+      │  │         RouteView.tsx  StepList.tsx
+      │  └─ map/ MapCanvas.tsx  markerIcon.ts
+      ├─ pages/ MainPage.tsx  LoginPage.tsx  SignupPage.tsx  NotFoundPage.tsx
+      └─ tests/
+```
+
+---
+
+## 5. 디자인 시스템 (토스 스타일)
+
+### 5.1 방향 — "약간 토스 스타일"의 해석
+- **한 화면 = 한 가지 질문**(랜딩은 입력칸 하나), 큰 굵은 제목, 넉넉한 여백.
+- 테두리보다 **옅은 회색 면(surface)** 과 **부드러운 그림자**, 큰 둥근 모서리.
+- 정보는 **큰 숫자 + 작은 보조 설명** 위계(가격이 주인공).
+- 문구는 친근한 **해요체**("찾아보고 있어요", "결과가 없어요").
+- 지도·가격표 화면은 정보 밀도가 높으므로 **카드·행(row) 단위로 깔끔하게** 구성한다. 토스의 "느낌"만 가져오고 모방은 하지 않는다.
+
+### 5.2 디자인 토큰 (`styles/tokens.css`에 그대로)
+```css
+:root {
+  /* Brand */
+  --color-primary: #3182F6;
+  --color-primary-hover: #1B64DA;
+  --color-primary-tint: #E8F3FF;
+  --color-accent-teal: #0FA3A3;        /* '사이트' 뱃지 */
+  --color-accent-teal-tint: #E0F6F6;
+
+  /* Neutral (토스 계열 회색 스케일을 참고한 값) */
+  --color-text: #191F28;
+  --color-text-secondary: #4E5968;
+  --color-text-muted: #8B95A1;
+  --color-border: #E5E8EB;
+  --color-bg: #FFFFFF;
+  --color-surface: #F2F4F6;            /* 옅은 회색 면 */
+  --color-danger: #F04452;
+
+  /* Crowd — 의미 고정, 다른 용도 금지 */
+  --crowd-low: #2EB872;       /* 초록 */
+  --crowd-medium: #F5C400;    /* 노랑 */
+  --crowd-high: #F58A1F;      /* 주황 */
+  --crowd-very-high: #F04452; /* 빨강 */
+
+  /* Type */
+  --font-sans: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', system-ui, -apple-system, 'Malgun Gothic', sans-serif;
+  --fs-display: 32px; --lh-display: 42px;   /* 랜딩 제목 */
+  --fs-title: 22px;   --lh-title: 30px;     /* 패널 제목/답변문 */
+  --fs-body: 16px;    --lh-body: 24px;
+  --fs-small: 14px;   --lh-small: 20px;
+  --fs-caption: 12px; --lh-caption: 16px;
+  --fs-price: 20px;
+  --fw-regular: 400; --fw-medium: 500; --fw-bold: 700;
+
+  /* Space (4px scale) */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
+  --sp-6: 24px; --sp-8: 32px; --sp-12: 48px; --sp-16: 64px;
+
+  /* Shape */
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 24px; --radius-pill: 999px;
+  --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-input: 0 8px 28px rgba(25, 31, 40, 0.10);
+  --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 150ms; --dur-base: 240ms; --dur-slow: 400ms;
+
+  /* Layout */
+  --topbar-h: 64px;
+  --panel-w: 440px;
+  --content-max: 640px;      /* 랜딩 중앙 컬럼 */
+  --z-topbar: 1000; --z-popover: 1100;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; }
+}
+```
+
+### 5.3 컴포넌트 규칙
+- **Button**: 높이 48px(기본)/40px(small), 라운드 `--radius-md`, 15~16px/bold.
+  `primary`(파랑 면·흰 글자, hover `--color-primary-hover`), `secondary`(`--color-surface` 면 + `--color-text-secondary` 글자, 테두리 없음), `text`(배경 없음, 보조 색 글자).
+- **Card/Row**: 배경 흰색 또는 `--color-surface`, 라운드 `--radius-lg`, 구분선은 가급적 쓰지 않고 간격(12px)으로 분리. 선택 상태는 `--color-primary-tint` 배경 + 라운드 `--radius-md`.
+- **뱃지**: 높이 22px, 패딩 0 8px, 라운드 `--radius-sm`, 12px/bold. `매장`=파랑 글자+tint, `사이트`=teal 글자+tint.
+- **입력창(랜딩)**: 5.4 참고. **일반 입력창**: 높이 56px, 배경 `--color-surface`, 테두리 없음, 라운드 `--radius-md`, 포커스 시 `box-shadow: 0 0 0 2px var(--color-primary)`.
+- **포커스 링**: `:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }`
+- 숫자는 `font-variant-numeric: tabular-nums`.
+- **카운트업(`CountUp`)**: 최저가 숫자를 0 → 목표값으로 600ms ease-out 증가. `prefers-reduced-motion`이면 즉시 표시.
+
+### 5.4 TopBar
+- 높이 `--topbar-h`, 흰 배경, 하단 구분선 없음(결과 화면에서만 1px `--color-border`).
+- 좌: `Logo`(클릭 시 **랜딩으로 초기화**). 우: `로그인`(`text` 버튼 15px). 메뉴 없음.
+- 로고: 물결 SVG 아이콘(22px, primary) + `제주얼마꽈`(bold, 20px, `--color-text`).
+
+---
+
+## 6. 화면 명세
+
+### 6.1 `/` MainPage — 단일 페이지, 3단계(phase)
+`phase`: `landing` → `loading` → `results`. URL은 `/`(landing) 또는 `/?q=<질의>`(results). 제출 시 `history.pushState`, 뒤로가기(`popstate`)는 landing 복귀, `/?q=`로 직접 진입/새로고침하면 자동 검색 실행.
+
+#### 6.1.1 phase=landing — F-01
+```
+┌────────────────────────────────────────────┐
+│ [제주얼마꽈]                        로그인  │  ← TopBar
+│                                            │
+│                                            │
+│        오늘 제주 가격,                      │  ← display 32px bold
+│        뭐가 궁금하세요?                     │
+│                                            │
+│   ┌──────────────────────────────── (↑) ┐  │  ← 입력칸(pill) + 전송 버튼
+│   └────────────────────────────────────┘  │
+│                                            │
+└────────────────────────────────────────────┘
+```
+- **화면에 존재하는 요소는 TopBar, 제목, 입력칸뿐이다.** (예시 칩·안내문·사진 금지)
+- 중앙 컬럼 `max-width: var(--content-max)`, 세로 위치는 정중앙보다 약 40px 위. 제목과 입력칸 간격 28px.
+- **LandingInput**: `<textarea>`(자동 높이, 1~3줄, 최대 200자). 높이 64px, 라운드 `--radius-xl`, 흰 배경, 1px `--color-border`, `--shadow-input`, 포커스 시 파란 2px 링. 자동 포커스.
+  - placeholder: `예) 노형동 근처에서 우유 제일 싼 곳 알려줘`
+  - 우측 **전송 버튼**: 44px 원형, 입력이 있으면 파랑 면 + 흰 `ArrowUp` 아이콘, 없으면 `--color-surface` + 회색 아이콘(`disabled`).
+  - **Enter=제출, Shift+Enter=줄바꿈.** IME(한글 조합) 중 Enter는 제출하지 않는다(`event.nativeEvent.isComposing` 확인).
+  - 공백만 있으면 제출 불가.
+- `view-transition-name: search-input`을 입력칸 래퍼에 지정(6.1.3 전환용).
+
+#### 6.1.2 phase=loading
+- 입력칸은 그대로 두고 전송 버튼이 스피너로 바뀌며 입력은 읽기 전용. 입력칸 아래에 `찾아보고 있어요` + 점 3개 깜빡임(1.2s 루프).
+- 위치 처리(7.4): 제출 직후 `navigator.geolocation`을 **한 번** 요청(권한 프롬프트). 5초 안에 응답 없거나 거부되면 기본 위치(제주시청)로 진행. 이 시간은 loading에 포함된다.
+- 응답 타임아웃 70초 → `error` 처리: 입력칸 아래 빨간 문구(`error.message`), phase는 landing(또는 직전 상태)으로 복귀.
+
+#### 6.1.3 phase=results — 전환과 레이아웃
+- **전환**: `startViewTransition`으로 DOM을 results 레이아웃으로 교체한다. 입력칸(`search-input`)은 화면 중앙에서 **TopBar 안의 컴팩트 입력창으로 이동**하는 연출(400ms, `--ease-out`). 미지원 브라우저는 애니메이션 없이 즉시 전환.
+- 레이아웃:
+```
+┌──────────────────────────────────────────────────────────────┐
+│ [로고]  [ 컴팩트 입력창 (pill 48px, 최대 720px) ......(↑) ]  로그인 │ 64px
+├───────────────┬──────────────────────────────────────────────┤
+│ 좌측 패널      │                                              │
+│ 440px         │              MapCanvas                       │
+│ (세로 스크롤)  │         (남은 폭 전체, 높이 100%)             │
+└───────────────┴──────────────────────────────────────────────┘
+```
+- 본문 높이 `calc(100vh - var(--topbar-h))`, 페이지 스크롤 없음, **좌측 패널 내용만 스크롤**.
+- 컴팩트 입력창에서 새 질의를 제출하면 같은 흐름(loading 표시는 패널 상단 스피너 + 지도 위 반투명 오버레이 `찾아보고 있어요`)으로 갱신한다. 이전 결과는 성공 응답 전까지 유지.
+
+#### 6.1.4 좌측 패널 (위→아래)
+
+**① AgentSummary — F-03** (배경 `--color-primary-tint`, 라운드 `--radius-lg`, 패딩 20px, 하단 간격 16px)
+- **답변문**: 응답의 `answer`를 `--fs-title`/bold로 표시(최대 3줄, 넘치면 말줄임).
+- **해석 칩**(읽기 전용, 작은 pill): `상품 {item}`, `기준 {origin.label}`, `{정렬 라벨}`. 값이 null이면 해당 칩 생략.
+  - 정렬 라벨: `추천순`/`가까운 순`/`싼 순`(현재 `sortKey` 기준, 사용자가 정렬 버튼을 바꾸면 따라서 변함).
+- **최저가 강조**(`status==='ok'`이고 가격이 있는 결과가 있을 때, **클라이언트에서 계산**): `가장 싼 곳` 라벨(12px muted) + 매장/몰 이름 + **가격(`CountUp`, 28px bold, primary)**.
+- `status==='needs_clarification'`이면 답변문만 표시하고 아래 요소(②~⑤)는 렌더링하지 않는다.
+
+**② LocationChip** — `{label} 기준 · 변경`(14px, `text` 버튼 스타일). 클릭 시 팝오버(폭 320px, `--shadow-panel`, `--radius-lg`):
+- `현재 위치 사용`(geolocation, 타임아웃 8초) / 입력창 + `주소로 설정`(`/api/geocode`).
+- 위치가 바뀌면 **AI를 다시 호출하지 않고** `POST /api/metrics`로 도로 기준 거리·시간만 재계산(7.3). 재계산 중 목록 거리 영역에 스켈레톤(회색 바).
+
+**③ ViewTabs — F-12**: `목록` | `가격표` (밑줄 탭, 활성은 `--color-text` bold + 2px 검정 밑줄, 비활성은 muted). 기본 `목록`.
+
+**④ ClassificationBar — F-05**
+- **정렬**(세그먼트, 단일): `추천순` | `거리순` | `가격순`. 초기값은 응답 `view_hint.sort`(없으면 `recommend`).
+- **유형 필터**(칩, 단일): `전체 (n)` | `오프라인 (n)` | `온라인 (n)`. 초기값은 `view_hint.type_filter`(없으면 `all`).
+- 칩 스타일: 높이 36px, 비활성 `--color-surface`+secondary 글자, 활성 `--color-text` 면+흰 글자.
+- 정렬 규칙(모두 오름차순, **클라이언트 처리**, 필터 → 정렬 순):
+
+| 정렬 | 규칙 |
+|---|---|
+| 추천순 | `rank` 오름차순 |
+| 거리순 | 오프라인: `road.distance_m` 오름차순(없으면 맨 뒤) → 그 뒤 온라인을 `rank` 순 |
+| 가격순 | `price.amount` 오름차순, null은 맨 뒤 |
+
+**⑤ 본문**: `ViewTabs` 선택에 따라 `ResultList`(6.2) 또는 `PriceTable`(6.3). 결과 없음: `조건에 맞는 곳이 없어요.` / 필터 결과 0건도 동일.
+
+#### 6.1.5 패널 모드 전환 (목록 ↔ 길안내)
+오프라인 카드의 `길안내` 버튼을 누르면 패널 전체가 `RouteView`(6.4)로 교체된다(`panelMode='route'`). 좌상단 `← 결과로`(뒤로) 버튼으로 복귀하며, 복귀 시 선택·정렬·탭 상태와 지도 줌은 유지, 경로선·출발 마커만 제거.
+
+### 6.2 ResultList / ResultCard — F-04, F-06, F-08, F-09
+- 카드는 Toss형 **행(row)**: 높이 자동(최소 76px), 패딩 16px, 라운드 `--radius-md`, 카드 간 간격 4px. 선택 시 `--color-primary-tint` 배경.
+```
+ 1   예시마트 노형점  ● 약 180명         ← 순번(파랑 bold) + 이름 + CrowdBadge
+     [매장]  제주시 노형동 · 2.4km · 6분   ← 도로 기준(자동차)
+     2,480원 / 1L                         ← 가격 20px bold
+     [ 길안내 ]                            ← 오프라인 + 선택된 카드에만
+```
+```
+ 2   쿠팡  ↗
+     [사이트]  2,650원 / 1L
+```
+- 순번 = 현재 표시 순서(1부터). 거리 표기: `850m`/`2.4km`, 시간 `6분`/`1시간 5분`. `road.source==='estimate'`면 `약`+`(추정)`을 붙인다. `road`가 없으면 거리·시간 생략.
+- **오프라인 카드 클릭**: `selectedId` 설정 → 선택 스타일 + `길안내` 버튼 노출 + 지도 `flyTo(zoom 16, 0.6s)` + 마커 팝업(매장명).
+- **온라인 카드 클릭**: `safeUrl(deeplink_url)` 유효 시 `window.open(url,'_blank','noopener,noreferrer')`. 유효하지 않으면 이동하지 않는다. (`<a target="_blank" rel="noopener noreferrer">` 구현 권장)
+- `view_hint.focus_place_id`가 있으면 결과 도착 시 해당 카드를 자동 선택하고 지도 이동.
+- 📚 **왜 `safeUrl`?** 링크는 AI가 만든 값입니다. 이상한 값(`javascript:…`)이 나와도 클릭만으로 위험한 동작이 실행되지 않도록 **https + 허용 도메인(`ALLOWED_ONLINE_HOSTS`)** 만 통과시킵니다.
+
+#### CrowdBadge
+10px 색 원 + `약 {N}명`(13px/medium)을 이름 바로 오른쪽에. `title="기준 시각 {as_of}"`. `crowd`가 null이면 숨김.
+| level | 의미 | 색 |
+|---|---|---|
+| `low` | 적음 | `--crowd-low`(초록) |
+| `medium` | 보통 | `--crowd-medium`(노랑) |
+| `high` | 많음 | `--crowd-high`(주황) |
+| `very_high` | 매우 많음 | `--crowd-very-high`(빨강) |
+
+### 6.3 PriceTable — F-12
+- 표 폭 100%, 헤더 sticky(배경 흰색, 12px muted), 행 높이 56px, 행 간 구분선 1px `--color-border`.
+- 열: **순위**(32px) | **이름**(가변; 아래에 작은 `매장`/`사이트` 뱃지) | **가격**(우측정렬, bold) | **거리·시간**(우측정렬; 오프라인 `2.4km · 6분`, 온라인 `-`) | **혼잡**(색 원만, 툴팁에 인원수; 온라인 `-`)
+- 최저가 행의 가격은 `--color-primary` bold + 이름 옆 작은 뱃지 `최저가`(primary tint).
+- 행 클릭 동작은 `ResultCard`와 **동일**(오프라인=지도 이동·선택, 온라인=새 탭). 정렬·필터(④) 공통 적용.
+- 가격 헤더 아래 보조문구: `기준 {가장 이른 checked_at 시각}`(12px muted). *(데이터 출처 문구 보강은 부록 B-07)*
+
+### 6.4 RouteView — 도로 기반 길안내 (F-07)
+```
+ ← 결과로
+ ┌─ 출발 ──────────────────────────┐
+ │ [ 출발 주소 입력 ...  ] [내 위치로] │   입력 후 Enter/버튼으로 안내 시작
+ └─ 도착  예시마트 노형점 ──────────┘
+ ──────────────────────────────────
+  24분 · 12.4km                        ← 28px bold + 보조(자동차, 예상)
+  교통상황 미반영 예상 시간이에요
+ ──────────────────────────────────
+  ⬆ 출발                         0m    ← StepList
+  ⬅ 좌회전      노형로            350m
+  ⬆ 직진        연삼로            1.2km
+  ⚑ 도착 예시마트 노형점
+```
+- **흐름**: 출발 주소 입력 → `POST /api/geocode` → `POST /api/route`. 초기 출발지는 현재 기준 위치(`origin`)이며 `내 위치로` 버튼으로 되돌린다.
+- **요약**: `{duration} · {distance}`(28px/bold) + `자동차 · 예상`(14px secondary). `provider==='estimate'`이면 `(추정)`과 `직선 기반 추정값이에요` 안내(14px, `--color-danger` 아님 secondary).
+- **StepList**: 단계당 행(높이 56px): 좌측 방향 아이콘(`actionIcon.ts`로 `action`→lucide 아이콘), 중앙 `instruction`(16px bold) + `road_name`(14px muted), 우측 `distance`(14px). 행 클릭 시 지도가 해당 `location`으로 `flyTo(zoom 17)` 하고 해당 행 강조.
+- **지도 연동**: 경로 폴리라인(`--color-primary`, 두께 6, 불투명도 .9, 아래에 흰색 두께 9 외곽선), 출발 마커(파란 원+`출발`), 도착 마커(기존 매장 마커 강조), `fitBounds`(padding 48).
+- **오류**: 지오코딩 실패 `주소를 찾지 못했어요. 더 자세히 입력해 주세요.` / 경로 실패 `경로를 계산하지 못했어요.` (입력창 아래 `--color-danger` 14px)
+- **[P3]** 요약 아래 탭 `자동차` | `대중교통`. 대중교통은 `VITE_FEATURE_TRANSIT !== 'true'`이면 `disabled` + 툴팁 `준비 중`. 활성 시 `POST /api/transit` 결과를 `버스 402 → 도보 5분 · 총 38분` 목록으로 표시.
+- 📚 **"내비게이션 형식"이란?** 경로를 한 줄(선)로만 그리지 않고, **교차로마다 "어디서 어느 쪽으로 꺾는지"를 단계로 쪼갠 목록**을 주는 것입니다. OSRM이 `steps`(회전 종류·도로명·거리)를 돌려주고, 우리는 이를 한국어 문장과 아이콘으로 바꿔 보여줍니다. 실시간 위치 추적 안내(차량 이동에 따라 안내가 넘어가는 방식)는 이번 범위가 아닙니다(부록 B-14).
+
+### 6.5 MapCanvas
+- Leaflet. 초기 `center=[33.38,126.55], zoom=10`. 타일은 `VITE_TILE_URL`(기본 OSM), attribution `© OpenStreetMap contributors` **반드시 표시**.
+- 오프라인 마커: 28px 원, 배경=혼잡도 색(없으면 primary), 흰 숫자(순번), 흰 테두리 2px+그림자, 선택 시 36px. 사용자(기준) 위치: 파란 점 14px + 반투명 후광 32px.
+- 결과 도착 시 오프라인 마커 + 기준 위치 `fitBounds`(padding 48, `maxZoom: 15`).
+- 컨테이너 크기 변화(phase 전환·패널 모드 변경)마다 `ResizeObserver`로 `map.invalidateSize()`. 📚 Leaflet은 처음 그릴 때의 div 크기를 기억하므로, 레이아웃이 바뀌면 "크기가 바뀌었다"고 알려 주지 않으면 타일이 회색으로 깨집니다.
+- **phase=landing에서는 지도를 마운트하지 않는다**(불필요한 타일 요청 방지). results 진입 시 마운트.
+
+### 6.6 `/login`, `/signup` — F-02 (P2, UI 전용, 토스 스타일)
+- 화면 중앙 컬럼 폭 400px, 위에서 120px. 제목(`로그인`/`회원가입`, 28px bold), 필드 간격 16px.
+- 입력창은 5.3의 일반 입력창(56px, 회색 면). 하단 `primary` 버튼(전체폭, 56px).
+- 로그인: `아이디`, `비밀번호` / 회원가입: `아이디`, `비밀번호`, `비밀번호 확인`.
+- 검증: 아이디 4~20자 영문·숫자, 비밀번호 8자 이상, 확인 일치. 오류는 입력창 아래 12px `--color-danger`.
+- 제출 → `POST /api/auth/*` → **501** → 폼 상단 `준비 중인 기능이에요.` 표시. **토큰/세션 저장 코드를 만들지 않는다.**
+
+---
+
+## 7. 에이전트 동작과 위치 처리
+
+### 7.1 기준 위치(origin) 결정 우선순위 (백엔드가 최종 결정)
+1. 에이전트가 해석한 `interpretation.origin_text`(예: "노형동") → `geocode`로 좌표화 → `source:"query"`
+2. 요청의 `user_location`(브라우저 GPS) → `source:"gps"`
+3. 기본값 제주시청 `{33.4996, 126.5312}` → `source:"default"`
+
+결정된 `origin`은 **응답에 포함**되고, 프론트는 이를 기준 위치 상태로 채택한다(LocationChip 라벨 = `origin.label`).
+
+### 7.2 첫 제출 시 위치 요청
+앱 시작 시에는 위치 권한을 요청하지 않는다. **첫 제출 직후** 한 번만 요청(6.1.2). 거부/무응답 시 `user_location:null`로 요청.
+
+### 7.3 에이전트가 정하는 화면 힌트(`view_hint`)
+"가장 싼" → `sort:"price"`, "가까운/근처" → `sort:"distance"`, "온라인에서" → `type_filter:"online"` 처럼 에이전트가 정한다. 프론트는 첫 렌더에 적용하되, 이후 사용자가 버튼으로 바꾸면 사용자 선택이 우선한다.
+
+### 7.4 되묻기
+질의가 가격 탐색과 무관하거나 모호하면 `status:"needs_clarification"`, `results:[]`, `answer`에 되묻는 문장을 담는다. 이때 phase는 `results`로 전환하되 패널에는 AgentSummary만 보이고 지도는 기본 제주 전경으로 표시.
+
+---
+
+## 8. ★ AI 슬롯 (구현 금지 영역과 경계)
+
+> 사용자가 **직접 학습시킨 모델**이 들어올 자리. 구현 AI는 **인터페이스·Mock·스텁까지만** 만든다.
+
+### 8.1 인터페이스 `backend/app/ai/base.py`
+```python
+from typing import Protocol
+from datetime import datetime
+from app.schemas import AgentSearchRequest, AgentSearchResult, CrowdInfo
+
+class AIAgent(Protocol):
+    async def search(self, req: AgentSearchRequest) -> AgentSearchResult:
+        """자연어 질의를 해석(interpretation)하고 답변문(answer)·화면 힌트(view_hint)·
+        후보(results: 오프라인 매장/온라인몰, 가격·순위 포함)를 반환한다.
+        거리/시간(road)은 채우지 않는다(백엔드가 OSRM으로 채움). crowd는 비워도 된다."""
+
+    async def estimate_crowd(self, place_ids: list[str], at: datetime) -> list[CrowdInfo]:
+        """오프라인 매장별 혼잡도(4단계)와 추정 인원수."""
+```
+- `AgentSearchRequest = {query, client_time}` (위치는 에이전트에 넘기지 않음: 기준 위치 결정·거리 계산은 백엔드 책임).
+- `AgentSearchResult = {status, answer, interpretation, view_hint, results}` (9.1의 응답에서 `origin`, `road`, `request_id`를 제외한 부분).
+
+### 8.2 구현체 (`registry.py`가 `AI_BACKEND`로 선택)
+| AI_BACKEND | 파일 | 동작 |
+|---|---|---|
+| `mock` **[기본값]** | `mock_agent.py` | 8.4 규칙 |
+| `local` | `local_model_agent.py` | **스텁**: `NotImplementedError("AI model not connected")` → API가 `503 AI_NOT_READY`로 변환 |
+
+`local_model_agent.py` 상단 docstring:
+```
+이 파일에 학습된 모델을 연결한다.
+- 입력: AgentSearchRequest / 출력: AgentSearchResult (9.1 계약 준수)
+- 연결 방식 예: (a) 같은 프로세스에서 모델 로드 (b) AI_ENDPOINT 의 로컬 HTTP 서버 호출
+- 반출 불가 데이터(카드·유동인구 등)는 센터 PC 안에서만 접근한다. 이 저장소에 원본 데이터를 포함하지 않는다.
+```
+
+### 8.3 오케스트레이션 (`api/search.py`, 순서 고정)
+1. `agent.search(req)` (타임아웃 `AI_TIMEOUT_S`, 초과 시 `504 AI_TIMEOUT`).
+2. **응답 검증·정제**: Pydantic 실패, 좌표가 제주 범위(위도 33.1~33.65, 경도 126.1~127.0) 밖, `deeplink_url` 비허용 항목은 **그 항목만 제거**(전체 실패 아님)하고 경고 로그. 최대 `MAX_RESULTS=30`개.
+3. **기준 위치 결정**(7.1) → `origin`.
+4. 오프라인 결과 전체에 대해 `router.matrix(origin, destinations)` **1회 호출** → 각 `place.road` 채움(실패 시 폴백 `estimate`).
+5. `crowd`가 null인 오프라인 항목을 모아 `agent.estimate_crowd(ids, now)` **1회 호출**.
+6. 응답 조립 → 반환.
+
+### 8.4 Mock AI 규칙 (결정적)
+- 데이터: `stores.json`(오프라인 10), `online_malls.json`(온라인 4).
+- **해석**: `intent` — 질의에 `싼|저렴|최저` → `cheapest`, `가까|근처|주변` → `nearest`, 그 외 `compare`. `item` — 불용어(`알려줘|제일|가장|근처|에서|어디|싼|곳|…`) 제거 후 남은 구문(없으면 null). `origin_text` — 정규식 `([가-힣]+(?:동|읍|면|리))\s*(?:에서|근처|쪽|주변)` 첫 매치.
+- **view_hint**: cheapest→`price`, nearest→`distance`, 그 외 `recommend`; `type_filter`는 `온라인`/`쇼핑몰` 포함 시 `online`, `마트|매장|오프라인` 포함 시 `offline`, 아니면 `all`; `focus_place_id`는 정렬 1위의 id.
+- **answer**(해요체): 예) `{item} 가격을 비교해 봤어요. {1위 이름}이(가) 가장 저렴해요.` (item이 null이면 `찾은 곳을 가격 순으로 보여드려요.`)
+- **되묻기**: 질의 정규화 값이 `{"안녕","hi","hello","ㅎㅇ"}`에 속하거나 한글/영문/숫자가 하나도 없으면 `needs_clarification` + `어떤 상품의 가격이 궁금하세요? 예를 들어 '우유 1L'처럼 말해 주세요.`
+- **가격**: `base = 1500 + (sha256(query) % 4000)`(10원 단위 반올림), 매장별 `base * price_factor(0.9~1.15)`. **rank**는 가격 오름차순(오프라인·온라인 혼합).
+- **혼잡도**: `ratio = capacity_index * hour_profile(hour)`(11~13시, 17~19시 피크 종 모양 0.15~1.0), `estimated_people = round(ratio * max_people)`, level: `<.25 low`, `<.5 medium`, `<.75 high`, 그 이상 `very_high`. `source:"mock"`.
+- 온라인 `deeplink_url`: 쿠팡 `https://www.coupang.com/np/search?q={q}` / 네이버쇼핑 `https://search.shopping.naver.com/search/all?query={q}` / 11번가 `https://search.11st.co.kr/Search.tmall?kwd={q}` / G마켓 `https://browse.gmarket.co.kr/search?keyword={q}` (`urllib.parse.quote` 적용, README에 "외부 URL은 바뀔 수 있어 실제 동작 확인 필요" 명시).
+- `stores.json` 필드: `id,name,address,lat,lng,price_factor,capacity_index,max_people`. **좌표는 예시값**(README에 "실제 매장 위치 아님" 명시): 노형동(33.4846,126.4783), 연동(33.4890,126.4930), 이도동(33.4960,126.5470), 애월(33.4619,126.3311), 한림(33.4120,126.2640), 조천(33.5440,126.6370), 서귀포(33.2541,126.5601), 성산(33.4580,126.9420), 대정(33.2270,126.2520), 표선(33.3260,126.8310).
+
+---
+
+## 9. API 계약 (프론트 `types/api.ts` ↔ 백엔드 `schemas.py` 동일)
+
+공통: JSON. 오류 `{ "error": { "code": "STRING", "message": "한국어 문장" } }`.
+
+### 9.1 `POST /api/search`
+**Request**
+```json
+{ "query": "노형동 근처에서 우유 제일 싼 곳 알려줘",
+  "user_location": { "lat": 33.4996, "lng": 126.5312 },
+  "client_time": "2026-11-12T14:30:00+09:00" }
+```
+`query` 1~200자(공백 제거 후), `user_location` null 허용.
+
+**Response 200**
+```json
+{
+  "request_id": "uuid4",
+  "status": "ok",
+  "answer": "우유 1L 가격을 비교해 봤어요. 예시마트 노형점이 가장 저렴해요.",
+  "interpretation": { "item": "우유 1L", "origin_text": "노형동", "intent": "cheapest" },
+  "view_hint": { "sort": "price", "type_filter": "all", "focus_place_id": "store_001" },
+  "origin": { "lat": 33.4846, "lng": 126.4783, "label": "노형동", "source": "query" },
+  "results": [
+    {
+      "id": "store_001", "type": "offline", "rank": 1, "name": "예시마트 노형점",
+      "price": { "amount": 2480, "unit_label": "1L", "checked_at": "2026-11-12T09:00:00+09:00" },
+      "offline": { "address": "제주시 노형동 (예시)", "lat": 33.4846, "lng": 126.4783 },
+      "online": null,
+      "road": { "distance_m": 2400, "duration_s": 360, "source": "osrm" },
+      "crowd": { "level": "high", "estimated_people": 180, "as_of": "2026-11-12T14:00:00+09:00", "source": "mock" }
+    },
+    {
+      "id": "online_001", "type": "online", "rank": 2, "name": "쿠팡",
+      "price": { "amount": 2650, "unit_label": "1L", "checked_at": "2026-11-12T09:00:00+09:00" },
+      "offline": null,
+      "online": { "site_name": "쿠팡", "deeplink_url": "https://www.coupang.com/np/search?q=%EC%9A%B0%EC%9C%A0" },
+      "road": null, "crowd": null
+    }
+  ]
+}
+```
+- `status` ∈ `ok | needs_clarification`. `interpretation.intent` ∈ `cheapest | nearest | compare | other`. `view_hint.sort` ∈ `recommend|distance|price`, `type_filter` ∈ `all|offline|online`.
+- `type="offline"` ⇒ `offline` 필수·`online` null (online은 반대). `road.source` ∈ `osrm | naver | estimate`. `crowd.level` ∈ `low|medium|high|very_high`, `crowd.source` ∈ `model|mock`. `price`·`road`·`crowd`는 null 허용.
+- `origin.source` ∈ `gps | query | default`.
+
+### 9.2 `POST /api/metrics` — F-11 (AI 재호출 없이 거리·시간만 재계산)
+Req `{ "origin": {lat,lng}, "destinations": [ {"id":"store_001","lat":33.48,"lng":126.47} ] }` (최대 30개)
+Res `{ "metrics": [ {"id":"store_001","distance_m":2400,"duration_s":360,"source":"osrm"} ] }`
+
+### 9.3 `POST /api/geocode`
+Req `{ "address": "제주시 노형동 1234" }` → Res `{ "lat":33.48, "lng":126.47, "label":"제주시 노형동", "provider":"mock" }` / 실패 `404 GEOCODE_NOT_FOUND`.
+
+### 9.4 `POST /api/route` — F-07
+Req `{ "origin": {lat,lng}, "destination": {lat,lng}, "mode": "driving" }`
+Res
+```json
+{
+  "distance_m": 12400, "duration_s": 1440,
+  "geometry": [[33.4996,126.5312],[33.4990,126.5300]],
+  "steps": [
+    { "action":"depart", "instruction":"출발", "road_name":"중앙로", "distance_m":0, "duration_s":0, "location":[33.4996,126.5312] },
+    { "action":"left", "instruction":"좌회전", "road_name":"노형로", "distance_m":350, "duration_s":45, "location":[33.4990,126.5300] },
+    { "action":"arrive", "instruction":"도착", "road_name":"", "distance_m":0, "duration_s":0, "location":[33.4846,126.4783] }
+  ],
+  "provider": "osrm"
+}
+```
+- **모든 좌표는 `[lat, lng]`**(Leaflet 순서). OSRM의 `[lng, lat]`는 **백엔드에서 뒤집어** 내보낸다.
+- `action` ∈ `depart|straight|left|right|slight_left|slight_right|sharp_left|sharp_right|uturn|roundabout|arrive`.
+- `provider` ∈ `osrm|naver|estimate`. `estimate`면 `steps`는 `[출발, 도착]` 2개만, `geometry`는 2점.
+- 단계의 `distance_m`은 **"이 단계 지점에서 다음 안내 지점까지의 거리"**.
+
+### 9.5 `POST /api/transit` (P3, Mock)
+Req `{ origin, destination, depart_at }` → Res `{ "options":[{ "total_duration_s":2280, "transfers":0, "steps":[{"mode":"walk","label":"도보","duration_s":300},{"mode":"bus","label":"402번","duration_s":1800},{"mode":"walk","label":"도보","duration_s":180}] }], "provider":"mock" }`
+
+### 9.6 `POST /api/auth/login|signup` (P2) → 항상 `501 NOT_IMPLEMENTED` / `GET /api/health` → `{status, ai_backend, geocoder, router, osrm_reachable}`
+
+### 9.7 에러 코드
+| HTTP | code | 상황 | 프론트 문구 |
+|---|---|---|---|
+| 422 | `VALIDATION_ERROR` | 입력 검증 실패 | 서버 message |
+| 404 | `GEOCODE_NOT_FOUND` | 주소 없음 | 6.4 |
+| 501 | `NOT_IMPLEMENTED` | 인증 등 | `준비 중인 기능이에요.` |
+| 503 | `AI_NOT_READY` | AI 미연결 | `AI가 아직 연결되지 않았어요.` |
+| 504 | `AI_TIMEOUT` | AI 지연 | `응답이 늦어지고 있어요. 다시 시도해 주세요.` |
+| 502 | `UPSTREAM_ERROR` | 외부 서비스 실패 | 서버 message |
+
+---
+
+## 10. 경로 엔진 (OSRM) 세부 — F-07, F-11
+
+### 10.1 Provider 구성
+| 환경변수 | 값 | 설명 |
+|---|---|---|
+| `ROUTER` | `osrm`[기본] / `naver` / `estimate` | 주 경로 엔진 |
+| `OSRM_BASE_URL` | 기본 `http://127.0.0.1:5000` | |
+| `ROUTER_TIMEOUT_S` | 기본 5 | 초과 시 폴백 |
+
+`router_fallback.py`: **주 엔진 호출 → 예외/타임아웃/`NoRoute` 시 `estimate`로 대체**하고 결과에 `source/provider:"estimate"`를 기록. 대체가 일어나면 경고 로그(위치 정보는 남기지 않음).
+`estimate`: 거리 = haversine × 1.3, 시간 = 거리 ÷ 평균 30km/h, 경로 = 직선 2점.
+
+### 10.2 OSRM 호출 규격
+- **경로**: `GET {base}/route/v1/driving/{lng},{lat};{lng},{lat}?overview=full&geometries=geojson&steps=true`
+- **매트릭스(F-11)**: `GET {base}/table/v1/driving/{origin;dest1;dest2;...}?sources=0&annotations=distance,duration` → `distances[0][i+1]`, `durations[0][i+1]` 사용. 결과가 `null`인 항목(도달 불가)은 `estimate`로 개별 폴백.
+- 좌표는 **경도,위도 순**(OSRM 규약). 📚 지도 라이브러리(Leaflet)는 위도,경도 순이라 서로 반대입니다. 헷갈리지 않도록 **변환은 `router_osrm.py` 안에서만** 한다.
+- 매트릭스 한 번 호출로 모든 매장 거리를 구하므로, 매장 N개에 대해 경로를 N번 호출하지 않는다(📚 N번 호출하면 느리고 서버 부하가 큽니다).
+
+### 10.3 한국어 안내문 (`routing/instructions_ko.py`)
+입력: OSRM `maneuver.type`, `maneuver.modifier`, `name`, `rotary/roundabout exit`. 출력: `action` + `instruction`.
+
+| maneuver 조건 | action | instruction |
+|---|---|---|
+| type=`depart` | `depart` | `출발` |
+| type=`arrive` | `arrive` | `도착` |
+| modifier=`straight` (또는 `continue`, `new name`) | `straight` | `직진` |
+| modifier=`left` | `left` | `좌회전` |
+| modifier=`right` | `right` | `우회전` |
+| modifier=`slight left` | `slight_left` | `약간 좌회전` |
+| modifier=`slight right` | `slight_right` | `약간 우회전` |
+| modifier=`sharp left` | `sharp_left` | `급좌회전` |
+| modifier=`sharp right` | `sharp_right` | `급우회전` |
+| modifier=`uturn` | `uturn` | `U턴` |
+| type=`roundabout`/`rotary` | `roundabout` | `회전교차로 {exit}번째 출구` |
+| type=`on ramp`/`off ramp`/`fork`/`merge` | modifier 기준 위 규칙 적용(없으면 `straight`) | 위와 동일 |
+- 알 수 없는 조합은 `직진`으로 처리하고 경고 로그. `road_name`은 OSRM `name` 그대로(빈 문자열 허용).
+- 단위 테스트에 위 표의 모든 행을 포함한다.
+
+### 10.4 OSRM 데이터 준비 (`scripts/osrm_prepare.sh`, `docker-compose.osrm.yml`)
+```bash
+# 1) 대한민국 OSM 추출본 다운로드 (Geofabrik: asia/south-korea) → osrm-data/south-korea-latest.osm.pbf
+# 2) 제주 영역만 잘라 용량 절감 (osmium-tool 필요)
+osmium extract -b 126.10,33.10,127.00,33.65 osrm-data/south-korea-latest.osm.pbf -o osrm-data/jeju.osm.pbf
+# 3) OSRM 전처리 (MLD 알고리즘)
+docker run --rm -t -v "$PWD/osrm-data:/data" ghcr.io/project-osrm/osrm-backend osrm-extract   -p /opt/car.lua /data/jeju.osm.pbf
+docker run --rm -t -v "$PWD/osrm-data:/data" ghcr.io/project-osrm/osrm-backend osrm-partition /data/jeju.osrm
+docker run --rm -t -v "$PWD/osrm-data:/data" ghcr.io/project-osrm/osrm-backend osrm-customize /data/jeju.osrm
+```
+```yaml
+# docker-compose.osrm.yml
+services:
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend
+    command: osrm-routed --algorithm mld /data/jeju.osrm --max-table-size 100
+    ports: ["5000:5000"]
+    volumes: ["./osrm-data:/data"]
+    restart: unless-stopped
+```
+- 스크립트는 파일 존재 여부를 검사하고, 이미 전처리가 끝났으면 건너뛴다. `osrm-data/`는 `.gitignore`에 추가.
+- ⚠️ 위 명령·이미지 이름·다운로드 경로는 구현 시 **공식 문서로 최신 여부를 확인**한다. Docker를 쓸 수 없는 환경이면 같은 명령을 `osrm-backend` 네이티브 바이너리로 실행한다.
+- 한계 고지(README): 제주 외 도서(추자도 등)는 범위 밖, 실시간 교통 미반영, OSM의 일방통행·회전 제한 정보가 실제와 다를 수 있음. 데이터 © OpenStreetMap contributors (ODbL) — `docs/DATA_USAGE.md`에 출처·라이선스 기재.
+- 📚 **왜 `--algorithm mld`?** OSRM은 전처리 방식(CH/MLD)에 따라 실행 옵션이 달라집니다. 여기서는 `partition`+`customize` 전처리를 쓰는 MLD로 통일해, 전처리와 실행 옵션이 어긋나 서버가 안 뜨는 실수를 막습니다.
+
+---
+
+## 11. 백엔드 공통
+
+### 11.1 지오코딩 Provider (`GEOCODER`)
+`mock`[기본]: `landmarks.json` 부분일치(읍면동 지명 사전), 없으면 제주시청 좌표 + label에 `(대략)` / `nominatim`: `https://nominatim.openstreetmap.org/search?format=json&q=...&countrycodes=kr`, User-Agent 필수, 초당 1회 제한 준수 / `naver`: 키(`NAVER_CLIENT_ID/SECRET`) 없으면 시작 시 경고 후 `mock` 폴백. 공통 베이스 `async def geocode(address)`.
+📚 왜 갈아끼우게 하나? "지금은 가짜, 나중엔 진짜, 센터에선 오프라인"처럼 환경마다 필요한 구현이 다르므로, 인터페이스 뒤에 숨겨 화면 코드를 바꾸지 않기 위함입니다.
+
+### 11.2 `.env.example`
+```
+# --- AI 슬롯 ---
+AI_BACKEND=mock            # mock | local
+AI_ENDPOINT=
+AI_TIMEOUT_S=60
+# --- 지오코딩/경로 ---
+GEOCODER=mock              # mock | nominatim | naver
+ROUTER=osrm                # osrm | naver | estimate
+OSRM_BASE_URL=http://127.0.0.1:5000
+ROUTER_TIMEOUT_S=5
+NAVER_CLIENT_ID=
+NAVER_CLIENT_SECRET=
+# --- 보안/동작 ---
+ALLOWED_ORIGINS=http://localhost:5173
+ALLOWED_ONLINE_HOSTS=www.coupang.com,search.shopping.naver.com,search.11st.co.kr,browse.gmarket.co.kr
+MAX_RESULTS=30
+LOG_LEVEL=INFO
+# --- 프론트(빌드 시 주입) ---
+VITE_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png
+VITE_FEATURE_TRANSIT=false
+```
+
+### 11.3 보안·개인정보
+- 사용자의 **질의·주소·좌표를 로그에 남기지 않는다**(요청 ID·상태 코드·소요시간만). 위치는 메모리에만, `localStorage` 등 저장 금지.
+- CORS는 `ALLOWED_ORIGINS`만. 입력 길이는 Pydantic 제약. AI 출력 문자열은 `dangerouslySetInnerHTML`로 렌더링하지 않는다.
+- 제출물에 `.env`, 키, 반출 불가 원본 데이터를 포함하지 않는다.
+
+---
+
+## 12. 프론트 세부
+
+### 12.1 상태 (`useAppStore`, zustand)
+```ts
+{
+  phase: 'landing' | 'loading' | 'results';
+  errorMessage: string | null;
+  query: string;
+
+  // 에이전트 응답
+  status: 'ok' | 'needs_clarification' | null;
+  answer: string; interpretation: Interpretation | null;
+  origin: { lat:number; lng:number; label:string; source:'gps'|'query'|'default' } | null;
+  results: Place[];
+
+  // 화면 상태
+  sortKey: 'recommend'|'distance'|'price';
+  typeFilter: 'all'|'offline'|'online';
+  viewTab: 'list'|'table';
+  panelMode: 'results'|'route';
+  selectedId: string | null;
+  route: RouteResult | null;  routeOrigin: LatLng | null;  activeStepIndex: number | null;
+  metricsLoading: boolean;
+
+  // selectors
+  visibleResults(): Place[];   // 필터 → 정렬
+  lowestPrice(): Place | null; // 가격 있는 항목 중 최저
+}
+```
+- 새 검색 성공 시: `view_hint`를 `sortKey/typeFilter/selectedId`에 반영, `panelMode='results'`, `route=null`, `viewTab='list'`.
+- 위치 변경(LocationChip): `/api/metrics` 호출 → `results[].road`만 갱신(AI 재호출 없음).
+
+### 12.2 유틸 시그니처
+```ts
+formatDistance(m): string   // '850m' | '2.4km'
+formatDuration(sec): string // '6분' | '1시간 5분'
+formatPrice(n): string      // '2,480원'
+crowdMeta(level): { color: string; label: string }
+safeUrl(raw, allowedHosts): string | null   // https + 허용 도메인만
+actionIcon(action): LucideIcon              // depart→Navigation, left→CornerUpLeft ... arrive→Flag
+runWithTransition(fn): void                 // startViewTransition 있으면 사용, 없으면 fn() 즉시 (flushSync로 DOM 동기 갱신)
+```
+`geo.ts`에는 `haversine`만 두며, **정렬·표시에는 사용하지 않는다**(폴백 계산은 백엔드 `estimate`만 사용).
+
+### 12.3 API 클라이언트
+`fetch` 래퍼, 타임아웃 70초(`AbortController`), 오류 응답을 `{code,message}`로 throw. 개발 프록시: `vite.config.ts`의 `server.proxy: { '/api': 'http://127.0.0.1:8000' }`.
+
+---
+
+## 13. 비기능 / 테스트
+
+**비기능**: 최신 Chrome·Edge(데스크톱). 센터 PC(i7-8700 / GTX1060 / RAM 32GB)에서 프론트+백엔드+OSRM(제주 추출본)이 AI 모델과 함께 동작(OSRM은 CPU/RAM 위주, GPU 미사용). 초기 JS(gzip) 300KB 이하 목표(지도 컴포넌트는 `React.lazy`로 results 진입 시 로드). 접근성 최소선: 시맨틱 태그, 입력의 `<label>`(시각적 숨김 가능), 포커스 링, 색만으로 정보 전달 금지(혼잡도는 `약 N명` 텍스트 병기).
+
+**백엔드(pytest)**
+- `/api/search`: 정상 / 빈 query 422 / `needs_clarification` 경로 / 비허용 deeplink 제거 / 응답 `road` 채워짐 / `AI_BACKEND=local` 503 / `origin_text`가 있으면 `origin.source=='query'`.
+- `/api/metrics`: OSRM 모킹 성공, OSRM 실패 시 `estimate` 폴백 + `source` 표기, 도달 불가 항목 개별 폴백.
+- `/api/route`: OSRM 샘플 응답 파싱 → **좌표 순서 `[lat,lng]` 변환 검증**, `steps` 매핑.
+- `instructions_ko`: 10.3 표의 모든 행.
+- `mock_agent`: 같은 입력 → 같은 출력.
+
+**프론트(vitest)**
+- `formatDistance/Duration/Price`, `safeUrl`(비허용 도메인·`javascript:` 차단).
+- `visibleResults` 정렬·필터 조합(거리순은 `road.distance_m` 기준, road 없는 항목 후순위).
+- `LandingInput`: Enter 제출, Shift+Enter 줄바꿈, **IME 조합 중 Enter 무시**, 공백 제출 불가.
+- `MainPage`: landing에 입력칸 외 요소 없음 / 제출 후 results 전환 / `needs_clarification`이면 패널에 AgentSummary만.
+- `ResultCard`: `사이트`/`매장` 뱃지, 선택 시에만 `길안내` 버튼.
+- `runWithTransition`: `startViewTransition` 없는 환경에서 콜백이 즉시 실행.
+
+---
+
+## 14. 구현 순서와 검증
+
+| 단계 | 작업 | 검증 |
+|---|---|---|
+| 1 | 폴더·`.env.example`·FastAPI `main.py`·`/api/health` | `curl localhost:8000/api/health` |
+| 2 | `schemas.py`, `ai/base.py`, `mock_agent.py`, `registry.py`, `/api/search`(road는 임시 null) | `pytest test_search.py test_mock_agent.py` |
+| 3 | `router_*`, `router_fallback`, `instructions_ko`, `/api/metrics`, `/api/route`, `/api/geocode` | `pytest test_metrics.py test_route.py test_instructions_ko.py test_geocode.py` |
+| 4 | search 오케스트레이션에 origin 결정·matrix·crowd 연결 | `/api/search` 응답에 `origin`, `road` 존재 |
+| 5 | OSRM 준비 스크립트·compose(수동 실행 문서화) | `curl "$OSRM_BASE_URL/route/v1/driving/126.53,33.50;126.47,33.48"` 응답 `Ok` |
+| 6 | 프론트 스캐폴드, `tokens.css`, `global.css`, `TopBar/Logo/Button` | 화면 확인 |
+| 7 | `types/api.ts`, `lib/*`, 스토어, 단위 테스트 | `npm run test` |
+| 8 | **MainPage landing + LandingInput + 제출 흐름(loading) (F-01)** | landing에 입력칸만 존재 |
+| 9 | 결과 레이아웃 + **View Transition 전환** + MapCanvas(lazy) | 입력칸이 상단으로 이동, 지도 타일 정상 |
+| 10 | AgentSummary·CountUp·LocationChip·ViewTabs (F-03) | 답변문·칩·최저가 표시 |
+| 11 | ResultList/Card/Badges, ClassificationBar, PriceTable (F-04,05,09,11,12) | 정렬·필터 테스트 통과, 도로 거리 표시 |
+| 12 | 카드↔지도 연동, 온라인 새 탭(`safeUrl`) (F-06,08) | 카드 클릭 시 지도 이동, 비허용 URL 차단 |
+| 13 | **RouteView + StepList + 경로선 (F-07)** | 주소 입력 → 경로선·단계 목록 |
+| 14 | Login/Signup UI (F-02), (P3) transit Mock·비활성 탭 (F-10), `build_and_serve.sh`, README, docs 템플릿 | `npm run build` 후 단일 프로세스 실행 |
+
+**완료 기준(DoD)**: F-01~F-09, F-11, F-12 동작 / 거리·시간이 **도로 기준**(OSRM 기동 시)이며 폴백은 `(추정)` 표기 / `pytest`·`vitest` 통과 / 저장소에 실제 키·`.env`·반출 불가 데이터 없음 / **부록 B 항목 미구현**.
+
+---
+
+## 15. 대회 제출 문서 템플릿 (`docs/`, 목차만)
+`DATA_USAGE.md`(사용 데이터명·출처·이용조건·전처리/분석 흐름·외부 데이터·오픈소스 — **OpenStreetMap/OSRM 포함**), `AI_DISCLOSURE.md`(사용 AI 모델·활용 범위·외부 API·외부 코드), `USER_MANUAL.md`(설치·실행·사용법·오류·제약). `README.md`에는 설치·실행 절차, 의존성, 환경변수, **외부 서비스 의존성**(지도 타일·지오코딩·OSRM)을 명시.
+참고(AI 슬롯, 이 저장소에서 구현하지 않음): 혼잡도 모델 입력 후보는 센터 내부 반출 불가 데이터(카드 이용 현황, 외식업 포스, 교통량, 날씨 등)이며 센터 PC 안에서만 사용한다.
+
+---
+
+# 부록 A. 결정이 필요한 사항 (현재 `[기본값]`으로 처리 중)
+
+| # | 항목 | 현재 기본값 | 이유 |
+|---|---|---|---|
+| A1 | **가격 데이터 출처** | AI 슬롯 담당(Mock은 가짜) | 센터 데이터에 상품 가격이 없음 |
+| A2 | **매장 위치(좌표) 출처** | AI 슬롯 담당(Mock은 예시 좌표) | 지도 마커의 근거 |
+| A3 | **OSRM 구동 환경** | Docker(또는 네이티브)로 센터 PC에 설치 | 센터 PC에서 Docker/바이너리 실행이 허용되는지, OSM 파일 반입 방법 확인 필요 |
+| A4 | 혼잡도 `인원수` 정의 | 해당 시각 매장 내 추정 인원 | 카드 데이터로 직접 산출 어려움 |
+| A5 | 로그인 | UI만(서버 501) | 실제 인증 필요 여부 |
+| A6 | 첫 제출 시 위치 권한 요청(5초 후 제주시청 기본) | 사용 | 개인정보·UX |
+| A7 | 홈의 제주 풍경 사진 영역 삭제 | 삭제(입력칸만) | GPT형 랜딩 취지 |
+| A8 | 랜딩 상단 `로그인` 텍스트 버튼 유지 | 유지 | "입력칸만"과의 절충 |
+| A9 | 토스 스타일 적용 범위 | 토큰·랜딩·카드·문구 톤 | "약간"의 해석 |
+
+# 부록 B. 승인 대기 제안 — **승인 전 구현 금지**
+
+| ID | 제안 | 한 줄 이유 |
+|---|---|---|
+| B-01 | 진행 단계 표시(`질문 이해 → 매장 탐색 → 경로 계산`, 스트리밍) | 로컬 모델은 느림 |
+| B-02 | 지도 혼잡도 범례 | 색 의미 설명 |
+| B-03 | 마커 클릭 → 패널 카드 강조·스크롤 | 지도→목록 연동 |
+| B-05 | 랜딩 예시 질문 칩 | 첫 사용자 안내 (※ "입력칸만" 취지와 상충) |
+| B-06 | 혼잡도순 정렬 | 표시만 되고 정렬 불가 |
+| B-07 | "AI 추정치·기준 시각·데이터 출처" 안내 | 대회의 출처·사실관계 요구 |
+| B-08 | 모바일 반응형(바텀시트형 패널) | 현재 데스크톱 전용 |
+| B-09 | 푸터(출처·문의) | 공공 서비스 관례 |
+| B-10 | 최근 검색어·즐겨찾기 | 재사용성 |
+| B-11 | 도보·대중교통 확장(반출 가능 버스 데이터 활용) | F-10 구체화 |
+| B-12 | 영업시간·전화번호 | 매장 정보 보강 |
+| B-13 | **멀티턴 대화**("더 가까운 곳은?" 후속 질문, 대화 기록) | GPT형 경험 확장 |
+| B-14 | **실시간 내비 모드**(위치 추적·다음 안내 자동 전환) | 진짜 내비게이션 |
+| B-15 | **교통상황 반영 소요시간**(네이버 등 온라인 API) | OSRM은 실시간 교통 미반영 |
+| B-16 | 랜딩 배경에 은은한 제주 일러스트 | 제주 정체성 |

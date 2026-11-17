@@ -5,9 +5,8 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     # AI 슬롯
-    AI_BACKEND: str = "mock"  # mock | local
-    AI_ENDPOINT: str = ""
-    AI_TIMEOUT_S: float = 60.0
+    AI_BACKEND: str = "local"  # local | mock
+    AI_TIMEOUT_S: float = 110.0
 
     # 지도/경로
     GEOCODER: str = "mock"  # mock | nominatim | naver

@@ -56,6 +56,7 @@ export interface SearchResponse {
   query: string;
   generated_at: string;
   results: PlaceResult[];
+  agent_briefing?: string | null;
 }
 
 export interface GeocodeRequest {

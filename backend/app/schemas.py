@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -48,6 +48,8 @@ class PlaceResult(BaseModel):
     online: Optional[OnlinePlace] = None
     road: Optional[RoadMetric] = None
     crowd: Optional[CrowdInfo] = None
+    matched_query: Optional[str] = None
+    item_prices: Optional[Dict[str, int]] = None
 
 
 class SearchRequest(BaseModel):
@@ -66,12 +68,38 @@ class SearchRequest(BaseModel):
         return stripped
 
 
+class ComparisonItemPrice(BaseModel):
+    query: str
+    product_name: str
+    price: int
+
+
+class ComparisonStoreSummary(BaseModel):
+    label: str
+    name: str
+    type: Literal["online", "offline"]
+    total_price: int
+    shipping_fee: int = 0
+    tamna_discount_total: int = 0
+    badge: Optional[str] = None
+    items: List[ComparisonItemPrice] = []
+
+
+class ComparisonSummary(BaseModel):
+    ingredients: List[str] = []
+    best_strategy: Optional[str] = None
+    best_total_cost: Optional[int] = None
+    max_savings: Optional[int] = None
+    options: List[ComparisonStoreSummary] = []
+
+
 class SearchResponse(BaseModel):
     request_id: str
     query: str
     generated_at: str
     results: List[PlaceResult]
     agent_briefing: Optional[str] = Field(default=None, max_length=2000)
+    comparison: Optional[ComparisonSummary] = None
 
 
 class GeocodeRequest(BaseModel):

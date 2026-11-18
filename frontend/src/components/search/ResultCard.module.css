@@ -81,33 +81,24 @@
   white-space: nowrap;
 }
 
-.priceRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-start;
-}
-
-.priceText {
-  display: flex;
-  align-items: baseline;
+.priceRight {
+  flex-shrink: 0;
+  margin-left: var(--sp-2);
+  text-align: right;
 }
 
 .amount {
   font-size: var(--fs-price);
   font-weight: var(--fw-bold);
-  color: var(--color-text);
+  color: var(--color-primary);
   font-variant-numeric: tabular-nums;
-}
-
-.unit {
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
-  margin-left: 2px;
+  white-space: nowrap;
 }
 
 .noPrice {
   font-size: var(--fs-small);
   color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .actionsRow {

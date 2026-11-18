@@ -10,9 +10,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 
-load_dotenv()
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 # 환경변수 로드 (보안 규정 준수)
 CHAMPRICE_API_KEY = os.getenv("CHAMPRICE_API_KEY", "").strip()
@@ -104,18 +103,24 @@ def _get_champrice_jeju_prices(ingredients: List[str]) -> Dict[str, Dict[str, An
 
     price_map = {}
     for ing in ingredients:
-        matched = [p for p in products if ing in p["goodName"]]
+        matched = [
+            p for p in products
+            if ing in p["goodName"]
+            and not any(noise in p["goodName"] for noise in ("이유식", "진밥", "면도날", "반려", "강아지", "고양이"))
+        ]
         if not matched:
             continue
+        matched.sort(key=lambda p: (0 if p["goodName"].split("(")[0].strip() == ing else 1, len(p["goodName"])))
         prod = matched[0]
         for day in fridays:
             try:
                 rows = _call_champrice_xml("/getProductPriceInfoSvc", {"goodInspectDay": day, "goodId": prod["goodId"]})
                 jeju_rows = [int(r["goodPrice"]) for r in rows if r.get("entpId") in jeju_store_ids and r.get("goodPrice", "").isdigit()]
-                if jeju_rows:
+                target_rows = jeju_rows or [int(r["goodPrice"]) for r in rows if r.get("goodPrice", "").isdigit()]
+                if target_rows:
                     price_map[ing] = {
                         "product_name": prod["goodName"],
-                        "avg_large_mart_price": int(sum(jeju_rows) / len(jeju_rows)),
+                        "avg_large_mart_price": int(sum(target_rows) / len(target_rows)),
                         "inspect_day": f"{day[:4]}-{day[4:6]}-{day[6:]}",
                     }
                     break
@@ -127,6 +132,9 @@ def _get_champrice_jeju_prices(ingredients: List[str]) -> Dict[str, Dict[str, An
 def get_jeju_offline_options(ingredients: List[str], location_name: str = "연동", radius_km: float = 3.0) -> Dict[str, Any]:
     user_lat, user_lng = next((coords for k, coords in JEJU_DONG_COORDS.items() if k in location_name), (33.4890, 126.4983))
     champrice_map = _get_champrice_jeju_prices(ingredients)
+    offline_ingredients = [ing for ing in ingredients if ing in champrice_map]
+    if not offline_ingredients:
+        return {"user_location": location_name, "best_offline_store": None, "all_nearby_stores": []}
 
     stores = []
     # 1. 제주데이터허브 대규모점포정보.csv
@@ -185,8 +193,8 @@ def get_jeju_offline_options(ingredients: List[str], location_name: str = "연�
         items_detail = []
         raw_sum, final_sum = 0, 0
 
-        for ing in ingredients:
-            info = champrice_map.get(ing, {"product_name": f"{ing} (표준규격)", "avg_large_mart_price": 4500, "inspect_day": "최근 조사 기준"})
+        for ing in offline_ingredients:
+            info = champrice_map[ing]
             raw_p = int(round((info["avg_large_mart_price"] * type_factor) / 10.0) * 10)
             disc = int(round(raw_p * TAMNA_DISCOUNT_RATE)) if st["is_tamna_member"] else 0
             fin_p = raw_p - disc
@@ -236,7 +244,7 @@ def get_online_danawa_prices(ingredients: List[str], champrice_ref: Dict[str, An
 
     for ing in ingredients:
         ref_info = champrice_ref.get(ing, {})
-        search_q = ref_info.get("product_name", ing)
+        search_q = ing
         found = None
 
         if headers:
@@ -333,7 +341,10 @@ def run_jeju_smart_cart(ingredients: List[str], location_name: str = "연동") -
 
     for o_item in online_res["items"]:
         q = o_item["query"]
-        off_p = offline_item_map.get(q, {}).get("final_price", 999999)
+        if q not in offline_item_map:
+            online_only_picks.append(o_item)
+            continue
+        off_p = offline_item_map[q].get("final_price", 999999)
         if o_item["item_price"] < off_p:
             online_only_picks.append(o_item)
         else:
@@ -346,11 +357,16 @@ def run_jeju_smart_cart(ingredients: List[str], location_name: str = "연동") -
     hyb_ship = sum((0 if sum(x["item_price"] for x in v) >= FREE_SHIPPING_THRESHOLD else BASE_SHIPPING_FEE) + JEJU_ISLAND_EXTRA_FEE for v in hyb_grouped.values())
     hybrid_total = sum(x["final_price"] for x in offline_only_picks) + sum(x["item_price"] for x in online_only_picks) + hyb_ship
 
-    scenarios = [
-        {"strategy": f"전량 오프라인 방문 ({best_store['store_name']})", "total_cost": offline_total, "shipping_fee": 0},
-        {"strategy": "전량 온라인 묶음 배송 (다나와 최저가)", "total_cost": online_total, "shipping_fee": online_res["total_shipping_fee"]},
-        {"strategy": "온·오프라인 하이브리드 분할 구매", "total_cost": hybrid_total, "shipping_fee": hyb_ship},
-    ]
+    if best_store:
+        scenarios = [
+            {"strategy": f"전량 오프라인 방문 ({best_store['store_name']})", "total_cost": offline_total, "shipping_fee": 0},
+            {"strategy": "전량 온라인 묶음 배송 (다나와 최저가)", "total_cost": online_total, "shipping_fee": online_res["total_shipping_fee"]},
+            {"strategy": "온·오프라인 하이브리드 분할 구매", "total_cost": hybrid_total, "shipping_fee": hyb_ship},
+        ]
+    else:
+        scenarios = [
+            {"strategy": "전량 온라인 묶음 배송 (다나와 최저가)", "total_cost": online_total, "shipping_fee": online_res["total_shipping_fee"]},
+        ]
     winner = min(scenarios, key=lambda s: s["total_cost"])
     worst_cost = max(s["total_cost"] for s in scenarios)
 

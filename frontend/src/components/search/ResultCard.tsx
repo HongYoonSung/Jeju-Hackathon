@@ -68,11 +68,18 @@ export const ResultCard: React.FC<ResultCardProps> = ({
             </span>
           )}
         </div>
-        {isOffline && <CrowdBadge crowd={place.crowd} />}
+        <div className={styles.priceRight}>
+          {place.price ? (
+            <span className={styles.amount}>{formatPrice(place.price.amount)}</span>
+          ) : (
+            <span className={styles.noPrice}>가격 없음</span>
+          )}
+        </div>
       </div>
 
       <div className={styles.metaRow}>
         <TypeBadge type={place.type} />
+        {isOffline && <CrowdBadge crowd={place.crowd} />}
         {isOffline && place.offline && (
           <span className={styles.metaText}>
             {place.offline.address}
@@ -90,20 +97,10 @@ export const ResultCard: React.FC<ResultCardProps> = ({
           </span>
         )}
         {!isOffline && place.online && (
-          <span className={styles.metaText}>{place.online.site_name}</span>
-        )}
-      </div>
-
-      <div className={styles.priceRow}>
-        {place.price ? (
-          <div className={styles.priceText}>
-            <span className={styles.amount}>{formatPrice(place.price.amount)}</span>
-            {place.price.unit_label && (
-              <span className={styles.unit}> / {place.price.unit_label}</span>
-            )}
-          </div>
-        ) : (
-          <span className={styles.noPrice}>가격 정보 없음</span>
+          <span className={styles.metaText}>
+            {place.online.site_name}
+            {place.price?.unit_label ? ` · ${place.price.unit_label}` : ''}
+          </span>
         )}
       </div>
 

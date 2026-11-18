@@ -9,6 +9,9 @@ from urllib.parse import quote
 
 from ai.agent_runner import GEMINI_API_KEY, ask_jeju_cart_agent
 from app.schemas import (
+    ComparisonItemPrice,
+    ComparisonStoreSummary,
+    ComparisonSummary,
     CrowdInfo,
     OfflinePlace,
     OnlinePlace,
@@ -65,6 +68,11 @@ def _build_results(data: Dict[str, Any], generated_at: datetime) -> List[PlaceRe
             ),
             generated_at.isoformat(),
         )
+        item_prices = {
+            str(item.get("query")): int(item.get("final_price") or 0)
+            for item in item_details
+            if isinstance(item, dict) and item.get("query")
+        }
         results.append(
             PlaceResult(
                 id=_stable_id("offline", f"{store_name}|{address}"),
@@ -77,6 +85,7 @@ def _build_results(data: Dict[str, Any], generated_at: datetime) -> List[PlaceRe
                     checked_at=checked_at,
                 ),
                 offline=OfflinePlace(address=address, lat=lat, lng=lng),
+                item_prices=item_prices or None,
             )
         )
 
@@ -106,6 +115,7 @@ def _build_results(data: Dict[str, Any], generated_at: datetime) -> List[PlaceRe
                     site_name="네이버쇼핑",
                     deeplink_url=_online_search_url(query),
                 ),
+                matched_query=query,
             )
         )
 
@@ -119,6 +129,63 @@ def _build_results(data: Dict[str, Any], generated_at: datetime) -> List[PlaceRe
         result.rank = rank
     return results
 
+def _build_comparison(data: Dict[str, Any], ingredients: List[str]) -> ComparisonSummary:
+    options: List[ComparisonStoreSummary] = []
+
+    online_analysis = data.get("online_analysis") or {}
+    online_items = [
+        ComparisonItemPrice(
+            query=str(item.get("query") or ""),
+            product_name=str(item.get("title") or item.get("query") or ""),
+            price=int(item.get("item_price") or 0),
+        )
+        for item in (online_analysis.get("items") or [])
+    ]
+    if online_items or online_analysis.get("final_online_total") is not None:
+        options.append(
+            ComparisonStoreSummary(
+                label="온라인 최저가",
+                name="온라인 묶음배송",
+                type="online",
+                total_price=int(online_analysis.get("final_online_total") or 0),
+                shipping_fee=int(online_analysis.get("total_shipping_fee") or 0),
+                badge=f"배송비 {int(online_analysis.get('total_shipping_fee') or 0):,}원 포함",
+                items=online_items,
+            )
+        )
+
+    offline_analysis = data.get("offline_analysis") or {}
+    for idx, store in enumerate((offline_analysis.get("all_nearby_stores") or [])[:2], start=1):
+        store_items = [
+            ComparisonItemPrice(
+                query=str(item.get("query") or ""),
+                product_name=str(item.get("product_name") or item.get("query") or ""),
+                price=int(item.get("final_price") or 0),
+            )
+            for item in (store.get("items") or [])
+        ]
+        options.append(
+            ComparisonStoreSummary(
+                label=f"오프라인 매장 {idx}",
+                name=str(store.get("store_name") or f"매장 {idx}"),
+                type="offline",
+                total_price=int(store.get("total_final_price") or 0),
+                tamna_discount_total=int(store.get("total_saved_tamna") or 0),
+                badge=str(store.get("tamna_badge") or ""),
+                items=store_items,
+            )
+        )
+
+    rec = data.get("recommended_plan") or {}
+    return ComparisonSummary(
+        ingredients=ingredients,
+        best_strategy=rec.get("best_strategy"),
+        best_total_cost=rec.get("best_total_cost"),
+        max_savings=rec.get("max_savings"),
+        options=options,
+    )
+
+
 class LocalModelAgent:
     async def search(self, req: SearchRequest) -> SearchResponse:
         if not GEMINI_API_KEY:
@@ -127,14 +194,17 @@ class LocalModelAgent:
         model_result = await asyncio.to_thread(ask_jeju_cart_agent, req.query)
         generated_at = datetime.now(KST)
         briefing = model_result.get("agent_briefing")
+        parsed_ingredients = (model_result.get("parsed_intent") or {}).get("ingredients") or []
+        data = model_result.get("data") or {}
         return SearchResponse(
             request_id=_stable_id("request", f"{req.query}|{generated_at.isoformat()}"),
             query=req.query,
             generated_at=generated_at.isoformat(),
-            results=_build_results(model_result.get("data") or {}, generated_at),
+            results=_build_results(data, generated_at),
             agent_briefing=briefing.strip()[:2000]
             if isinstance(briefing, str) and briefing.strip()
             else None,
+            comparison=_build_comparison(data, [str(i) for i in parsed_ingredients]),
         )
 
     async def estimate_crowd(

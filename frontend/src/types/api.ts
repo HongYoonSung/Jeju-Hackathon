@@ -43,6 +43,8 @@ export interface PlaceResult {
   online?: OnlinePlace | null;
   road?: RoadMetric | null;
   crowd?: CrowdInfo | null;
+  matched_query?: string | null;
+  item_prices?: Record<string, number> | null;
 }
 
 export interface SearchRequest {
@@ -51,12 +53,38 @@ export interface SearchRequest {
   client_time?: string | null;
 }
 
+export interface ComparisonItemPrice {
+  query: string;
+  product_name: string;
+  price: number;
+}
+
+export interface ComparisonStoreSummary {
+  label: string;
+  name: string;
+  type: 'online' | 'offline';
+  total_price: number;
+  shipping_fee?: number;
+  tamna_discount_total?: number;
+  badge?: string | null;
+  items: ComparisonItemPrice[];
+}
+
+export interface ComparisonSummary {
+  ingredients: string[];
+  best_strategy?: string | null;
+  best_total_cost?: number | null;
+  max_savings?: number | null;
+  options: ComparisonStoreSummary[];
+}
+
 export interface SearchResponse {
   request_id: string;
   query: string;
   generated_at: string;
   results: PlaceResult[];
   agent_briefing?: string | null;
+  comparison?: ComparisonSummary | null;
 }
 
 export interface GeocodeRequest {

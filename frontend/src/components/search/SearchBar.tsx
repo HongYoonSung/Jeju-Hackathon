@@ -14,7 +14,7 @@ export const SearchBar: React.FC = () => {
     setAgentBriefing,
     setStatus,
     setErrorMessage,
-    setResults,
+    setSearchResponse,
   } = useSearchStore();
   const { location } = useLocationStore();
   const [inputVal, setInputVal] = useState(storedQuery);
@@ -39,8 +39,7 @@ export const SearchBar: React.FC = () => {
         client_time: new Date().toISOString(),
       });
       setQuery(query);
-      setResults(res.results);
-      setAgentBriefing(res.agent_briefing ?? null);
+      setSearchResponse(res);
     } catch (err) {
       setStatus('error');
       setErrorMessage(

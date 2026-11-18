@@ -25,23 +25,214 @@
   overflow: hidden;
 }
 
-.agentBriefing {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  background-color: var(--color-bg-subtle);
-  color: var(--color-text);
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-line;
+.rightColumn {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .mapArea {
   flex: 1;
-  height: 100%;
+  min-height: 240px;
   position: relative;
   overflow: hidden;
+}
+
+.bottomResultPanel {
+  flex: 0 0 auto;
+  max-height: 44%;
+  overflow-y: auto;
+  background-color: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+  padding: 14px 18px;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.panelTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: var(--fw-bold);
+  color: var(--color-text);
+}
+
+.savingsBadge {
+  font-size: 12px;
+  font-weight: var(--fw-bold);
+  color: var(--color-primary);
+  background-color: var(--color-primary-tint);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.toggleGroup {
+  display: inline-flex;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  gap: 2px;
+}
+
+.toggleButton {
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
+  border-radius: calc(var(--radius-md) - 2px);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.toggleActive {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.panelContent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summaryCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background-color: var(--color-bg);
+}
+
+.summaryCardBest {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-tint);
+}
+
+.summaryCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.optionLabel {
+  font-size: 11.5px;
+  font-weight: var(--fw-bold);
+  color: var(--color-text-muted);
+}
+
+.bestTag {
+  font-size: 11px;
+  font-weight: var(--fw-bold);
+  color: #ffffff;
+  background-color: var(--color-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.optionName {
+  font-size: 13px;
+  font-weight: var(--fw-bold);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionPrice {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: var(--fw-bold);
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.optionBadge {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.briefingBox {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.briefingLine {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.compareTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.compareTable th,
+.compareTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.compareTable th {
+  font-weight: var(--fw-bold);
+  color: var(--color-text);
+  background-color: var(--color-surface);
+}
+
+.thSub {
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--color-text-muted);
+}
+
+.ingredientCell {
+  font-weight: var(--fw-medium);
+  color: var(--color-text);
+}
+
+.priceCell {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.priceCellBest {
+  font-weight: var(--fw-bold);
+  color: var(--color-primary);
 }
 
 @media (max-width: 760px) {

@@ -8,17 +8,22 @@ echo "=== 제주얼마꽈 개발 서버 시작 ==="
 # 루트 디렉토리 이동
 cd "$(dirname "$0")/.."
 
-# 가상환경 파이썬 확인
-PYTHON_BIN="python"
-if [ -f ".venv/bin/python" ]; then
-  PYTHON_BIN=".venv/bin/python"
-elif [ -f ".venv/Scripts/python.exe" ]; then
-  PYTHON_BIN=".venv/Scripts/python.exe"
+# 가상환경 파이썬 확인 (iCloud 동기화 경로 내 .venv 지연을 피하기 위해 anaconda3 우선 확인)
+if [ -z "${PYTHON_BIN:-}" ]; then
+  if [ -x "/opt/anaconda3/bin/python" ] && /opt/anaconda3/bin/python -c "import fastapi, uvicorn" 2>/dev/null; then
+    PYTHON_BIN="/opt/anaconda3/bin/python"
+  elif [ -f ".venv/bin/python" ]; then
+    PYTHON_BIN=".venv/bin/python"
+  elif [ -f ".venv/Scripts/python.exe" ]; then
+    PYTHON_BIN=".venv/Scripts/python.exe"
+  else
+    PYTHON_BIN="python"
+  fi
 fi
 
 # 백엔드 uvicorn 백그라운드 실행
 export PYTHONPATH="backend"
-$PYTHON_BIN -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload &
+$PYTHON_BIN -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --reload-dir backend --reload-dir ai &
 BACKEND_PID=$!
 
 # 프론트엔드 vite 개발 서버 실행

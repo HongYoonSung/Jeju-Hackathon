@@ -5,6 +5,8 @@ import {
   MetricResult,
   RouteResponse,
   LatLng,
+  ComparisonSummary,
+  SearchResponse,
 } from '../types/api';
 
 export type SearchStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -16,6 +18,8 @@ interface SearchState {
   errorMessage: string | null;
   query: string;
   agentBriefing: string | null;
+  comparison: ComparisonSummary | null;
+  selectedIngredient: string | null;
   results: PlaceResult[];
   sortKey: SortKey;
   typeFilter: TypeFilter;
@@ -29,8 +33,10 @@ interface SearchState {
   setStatus: (status: SearchStatus) => void;
   setErrorMessage: (msg: string | null) => void;
   setResults: (results: PlaceResult[]) => void;
+  setSearchResponse: (response: SearchResponse) => void;
   setSortKey: (sortKey: SortKey) => void;
   setTypeFilter: (filter: TypeFilter) => void;
+  setSelectedIngredient: (ingredient: string | null) => void;
   setSelectedId: (id: string | null) => void;
   setRoute: (route: RouteResponse | null, origin: LatLng | null) => void;
   setMetricsLoading: (loading: boolean) => void;
@@ -46,8 +52,10 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   errorMessage: null,
   query: '',
   agentBriefing: null,
+  comparison: null,
+  selectedIngredient: null,
   results: [],
-  sortKey: 'recommend',
+  sortKey: 'price',
   typeFilter: 'all',
   selectedId: null,
   route: null,
@@ -62,6 +70,22 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     set({
       results,
       agentBriefing: null,
+      comparison: null,
+      selectedIngredient: null,
+      status: 'success',
+      errorMessage: null,
+      selectedId: null,
+      route: null,
+      routeOrigin: null,
+      metricsLoading: false,
+    }),
+  setSearchResponse: (response) =>
+    set({
+      query: response.query,
+      results: response.results,
+      agentBriefing: response.agent_briefing ?? null,
+      comparison: response.comparison ?? null,
+      selectedIngredient: null,
       status: 'success',
       errorMessage: null,
       selectedId: null,
@@ -71,6 +95,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     }),
   setSortKey: (sortKey) => set({ sortKey }),
   setTypeFilter: (typeFilter) => set({ typeFilter }),
+  setSelectedIngredient: (selectedIngredient) =>
+    set({ selectedIngredient, selectedId: null, route: null, routeOrigin: null }),
   setSelectedId: (id) =>
     set((state) => ({
       selectedId: id,
@@ -98,6 +124,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       errorMessage: null,
       query: '',
       agentBriefing: null,
+      comparison: null,
+      selectedIngredient: null,
       results: [],
       selectedId: null,
       route: null,
@@ -106,10 +134,34 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     }),
 
   getVisibleResults: (): PlaceWithDistance[] => {
-    const { results, sortKey, typeFilter } = get();
+    const { results, sortKey, typeFilter, selectedIngredient } = get();
+
+    // 0. 재료 선택 시 해당 재료의 단가/상품만 추출
+    const scopedResults: PlaceResult[] = selectedIngredient
+      ? results.reduce<PlaceResult[]>((acc, item) => {
+          if (item.type === 'online') {
+            if (item.matched_query === selectedIngredient) {
+              acc.push(item);
+            }
+            return acc;
+          }
+          const itemPrice = item.item_prices?.[selectedIngredient];
+          if (itemPrice !== undefined) {
+            acc.push({
+              ...item,
+              price: {
+                amount: itemPrice,
+                unit_label: selectedIngredient,
+                checked_at: item.price?.checked_at ?? '',
+              },
+            });
+          }
+          return acc;
+        }, [])
+      : results;
 
     // 1. 유형 필터 적용 (SPEC 5.3.3)
-    let filtered = results.filter((item) => {
+    let filtered = scopedResults.filter((item) => {
       if (typeFilter === 'offline') return item.type === 'offline';
       if (typeFilter === 'online') return item.type === 'online';
       return true;

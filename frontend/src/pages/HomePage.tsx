@@ -14,7 +14,7 @@ export const HomePage: React.FC = () => {
   const setQuery = useSearchStore((state) => state.setQuery);
   const setStatus = useSearchStore((state) => state.setStatus);
   const setErrorMessage = useSearchStore((state) => state.setErrorMessage);
-  const setResults = useSearchStore((state) => state.setResults);
+  const setSearchResponse = useSearchStore((state) => state.setSearchResponse);
   const [query, setInputQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setLocalErrorMessage] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export const HomePage: React.FC = () => {
         user_location: { lat: searchLocation.lat, lng: searchLocation.lng },
         client_time: new Date().toISOString(),
       });
-      setResults(response.results);
+      setSearchResponse(response);
       navigate('/search');
     } catch (error) {
       const message =
